@@ -14,6 +14,7 @@ from app.api.foods import router as foods_router
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
+from app.sentry import init_sentry
 from app.logging import configure_logging
 from app.middleware import RequestLoggingMiddleware
 
@@ -54,6 +55,7 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Compose startup/shutdown for both FastAPI and mounted FastMCP apps."""
 
     _validate_startup_settings()
+    init_sentry()
     # Ensure the process-wide engine is initialized during startup.
     _ = engine
     async with mcp_app.lifespan(app):
