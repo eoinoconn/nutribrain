@@ -14,6 +14,9 @@ router = APIRouter(prefix="/api/targets", tags=["targets"])
 DbSession = Annotated[Session, Depends(get_session)]
 
 
+# --- Request / Response schemas --------------------------------------------
+
+
 class TargetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +55,9 @@ class CreateTargetResponse(BaseModel):
     carbs_g: int
     fat_g: int
     same_day_overlap: bool
+
+
+# --- Routes ----------------------------------------------------------------
 
 
 @router.get("", response_model=list[TargetResponse])
