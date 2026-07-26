@@ -21,6 +21,10 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from app.logging import get_logger
+
+logger = get_logger(__name__)
+
 _UNPROTECTED_PREFIXES = ("/health",)
 
 
@@ -50,6 +54,7 @@ class AuthMiddleware:
         authorization = Headers(scope=scope).get("authorization")
         error = _auth_error(authorization, self.token)
         if error is not None:
+            logger.warning("auth_failure", reason=error, path=scope["path"])
             response = JSONResponse({"detail": error}, status_code=401)
             await response(scope, receive, send)
             return
