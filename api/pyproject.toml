@@ -47,3 +47,7 @@ pretty = true
 [[tool.mypy.overrides]]
 module = ["app.domain", "app.domain.*"]
 strict = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
