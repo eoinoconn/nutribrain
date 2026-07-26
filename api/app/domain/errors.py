@@ -40,6 +40,27 @@ class FoodAmbiguousError(DomainError):
         )
 
 
+class FoodDuplicateError(DomainError):
+    """add_food name collision without force: true."""
+
+    def __init__(self, name: str, candidates: list[dict[str, object]]) -> None:
+        super().__init__(
+            error="food_duplicate",
+            message=f"A food similar to '{name}' already exists. Use force to override.",
+            candidates=candidates,
+        )
+
+
+class ServingUnitImmutableError(DomainError):
+    """update_food attempt to change serving_unit."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            error="serving_unit_immutable",
+            message="Cannot change serving_unit. Create a new food instead.",
+        )
+
+
 class TemplateNotFoundError(DomainError):
     """Template could not be found by id or name."""
 

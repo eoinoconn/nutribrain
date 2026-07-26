@@ -1,5 +1,5 @@
 from app.db.base import Base
-from app.db.engine import SessionLocal, engine, get_session
+from app.db.engine import SessionLocal, engine, get_session, session_scope
 from app.db.models import (
     Food,
     IntervalsCaloriesOut,
@@ -32,4 +32,5 @@ __all__ = [
     "TemplateItem",
     "engine",
     "get_session",
+    "session_scope",
 ]

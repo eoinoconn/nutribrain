@@ -118,3 +118,34 @@ class TemplateResponse:
     created_at: datetime
     deleted_at: datetime | None
     items: list[TemplateItemResponse]
+
+
+@dataclass(frozen=True, slots=True)
+class EffectiveTarget:
+    """Effective target for a given day with base + activity breakdown (§3, §8).
+
+    ``calories_out`` is None when no cache row exists (distinct from 0 which
+    represents a genuine rest day).  The UI uses this to distinguish
+    "target 2500 (2000 base + 500 out)" from "target 2000 (no activity data)".
+    """
+
+    effective_from: date
+    base_calories: int
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+    calories_out: int | None
+    effective_calories: int
+
+
+@dataclass(frozen=True, slots=True)
+class SetTargetResult:
+    """Result of set_target: the new target row plus overlap info."""
+
+    id: int
+    effective_from: date
+    base_calories: int
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+    same_day_overlap: bool
