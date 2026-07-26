@@ -143,7 +143,7 @@ def log_meal(
     logger.info("meal_logged", meal_id=meal.id, item_count=len(resolved_items))
 
     # Add items to the meal
-    for spec, meal_item in resolved_items:
+    for _spec, meal_item in resolved_items:
         meal_item.meal_id = meal.id
         session.add(meal_item)
 
@@ -157,7 +157,7 @@ def log_meal(
 
     # Build response with resolved items
     item_responses = []
-    for i, (spec, meal_item) in enumerate(resolved_items):
+    for _spec, meal_item in resolved_items:
         # Reload the item to get the computed macros
         refreshed_item = session.get(MealItem, meal_item.id)
 
@@ -208,7 +208,7 @@ def _compute_meal_totals(
     total_sat_fat_g = Decimal("0")
     total_sodium_mg = Decimal("0")
 
-    for spec, meal_item in resolved_items:
+    for _spec, meal_item in resolved_items:
         # Reload item to ensure it has the ID
         refreshed_item = session.get(MealItem, meal_item.id)
 
