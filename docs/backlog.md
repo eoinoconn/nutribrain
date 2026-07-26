@@ -2,7 +2,7 @@
 
 Derived from `nutrition-tracker-spec.md`. Tasks are dependency-ordered and sized for a single agent to complete in one focused session with a reviewable diff at the end.
 
-**Section references (`§`) point back at the spec.** Where this backlog and the spec disagree, the spec wins — except for the items in *Spec gaps to close first*, which must be resolved before the affected phase starts.
+**Section references (`§`) point back at the spec, which is canonical.** The seven amendments below were folded into spec v1.1; where this backlog and the spec disagree on anything else, the spec wins.
 
 ---
 
@@ -26,40 +26,25 @@ Derived from `nutrition-tracker-spec.md`. Tasks are dependency-ordered and sized
 
 ---
 
-## Resolved amendments to the spec
+## Amendments folded into spec v1.1
 
-These are decided. They amend the spec; where the two disagree, this section wins. Copy them into `docs/decisions.md` in T-007.
+These were resolved before implementation and are now written into the spec itself,
+with a changelog table at its foot. Listed here only so the task references to
+`G1`-`G7` resolve.
 
-**G1 — soft-delete columns. Add.**
-`deleted_at timestamptz nullable` on `foods` and `templates`. Every read path filters `deleted_at IS NULL`; historical `meal_items` still resolve their food regardless.
+| # | Change | Affects |
+|---|---|---|
+| G1 | `deleted_at` added to `foods` and `templates` | T-010, T-011 |
+| G2 | Tool count corrected 15 -> 17 | T-051, T-052, T-053 |
+| G3 | `last_logged_at` / `logged_count` computed in-query, not stored | T-040 |
+| G4 | `quantity_unit` extended to twelve units; `foods.density_g_per_ml` added | T-010, T-020 |
+| G5 | `intervals_calories_out.source` added | T-010, T-045, T-061 |
+| G6 | Neon pool settings documented; no keep-alive ping | T-013 |
+| G7 | FastMCP auth inheritance corrected — **must be verified, not assumed** | T-030 |
 
-**G2 — the tool surface is 17, not 15.**
-The spec's count treats `create/update/delete_template` and `delete_meal`/`delete_meal_item` as single entries. 15 bullets, 17 tools. Build all 17; correct the §4 prose.
-
-**G3 — `last_logged_at` and `logged_count` are computed, not stored.**
-`find_food` returns both, derived in-query by joining `meal_items` → `meals`. Do **not** add columns to `foods`: stored counters must be maintained on every meal insert and delete, and a drifted counter silently corrupts the resolution rules in §4. At single-user scale the join is free.
-
-**G4 — extended unit set with per-food density.**
-
-- `meal_items.quantity_unit` and `template_items.quantity_unit` become: `g`, `kg`, `oz`, `lb`, `ml`, `l`, `fl_oz`, `tsp`, `tbsp`, `cup`, `piece`, `serving`.
-- `foods.serving_unit` stays `g`, `ml`, `piece`. It is the immutable reference unit; `add_food` normalises an incoming label serving ("1 cup") into `ml` before storing. Widening it would multiply the immutability problem for no gain.
-- New column `foods.density_g_per_ml numeric nullable`. Null means 1.0, preserving current behaviour. Set it per food (rice ≈ 0.78, oil ≈ 0.92) and volume units convert correctly.
-- Conversion factors live as a single domain-layer constant, not a table.
-
-Rationale: mass units are fixed factors and convert cleanly. Volume→mass is food-specific — a cup of rice is ~185 g, a cup of water ~237 g — so without density, adding `cup` makes the existing g≡ml simplification visibly wrong rather than quietly wrong. One nullable column does the job the `food_units` side table was going to do.
-
-Postgres enum values are easy to add and painful to remove, so the list above is deliberately complete at the outset.
-
-**G5 — override provenance. Add.**
-`intervals_calories_out.source enum('sync','manual')`. The sync worker writes `sync` and overwrites manual values by design (§8); the dashboard shows which days were hand-set.
-
-**G6 — no separate action.**
-Folded into T-013: pooled connection string, `pool_pre_ping=True`, `pool_recycle=300`, `pool_size=2`, compute pinned to 0.25 CU. No keep-alive ping — cold starts are accepted.
-
-**G7 — must be verified, not assumed. Highest-risk item in this list.**
-FastAPI's `dependencies=[...]` only runs for routes FastAPI owns. FastMCP is a separate ASGI app, and mounting hands the request off before the dependency machinery executes. If §9's inheritance assumption is wrong, `/mcp` is **entirely unauthenticated on the public internet** — every write tool exposed — and it fails silently, because your own client sends the header regardless.
-
-T-030 must assert that `/mcp` rejects a request with no `Authorization` header at all. If it doesn't reject, auth moves to ASGI middleware wrapping both mounts before any further work proceeds.
+G7 is the one to read in full before starting Phase 3. If the assumption in the
+original spec had gone unchecked, every MCP write tool would have been exposed
+unauthenticated.
 
 ---
 
@@ -432,7 +417,9 @@ Full CRUD plus `POST /api/templates/{id}/log` accepting `quantity_scale`.
 **Depends:** T-050, T-023, T-024, T-026 **Spec:** §4, §5
 `log_meal`, `log_template`, `add_food`, `update_food`, `create_template`, `update_template`, `delete_template`, `set_target`, `set_favorite_food`, `delete_meal`, `delete_meal_item`.
 
-Tool descriptions must encode the §5 "what Claude should not do" rules — that `update_food` rewrites history and is never the fix for one meal, that templates are user-initiated only, that ambiguity gets escalated rather than guessed. The description is the enforcement mechanism for a model-facing API.
+`add_food` must encode the `serving_unit` convention from §3 in its description: prefer mass with `serving_size` = the weight of one natural unit, reserve `piece` for foods with no useful weight. Claude creates most foods during label scans, and a `piece`-defined food is a one-way door — the description is the only thing standing between a label reading "12 squares per bar" and an unweighable food.
+
+Tool descriptions must likewise encode the §5 "what Claude should not do" rules — that `update_food` rewrites history and is never the fix for one meal, that templates are user-initiated only, that ambiguity gets escalated rather than guessed. The description is the enforcement mechanism for a model-facing API.
 
 ### T-052 · Read tools
 **Depends:** T-050, T-027 **Spec:** §4

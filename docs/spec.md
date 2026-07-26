@@ -229,6 +229,22 @@ These rules define what edits propagate to historical data and what stays local.
 - Editing `food.name` is cosmetic — propagates freely
 - Editing `food.serving_unit` is **forbidden**. The API must reject this; the correct action is to create a new food.
 
+**Choosing `serving_unit` — convention, not a constraint.**
+
+Because `serving_unit` is immutable, it fixes the dimension a food can ever be
+logged in. Mass and volume interoperate via `density_g_per_ml`; `piece` bridges
+to neither, so a `piece`-defined food can never be logged by weight and vice
+versa.
+
+Therefore: **if a food has a natural countable unit *and* a meaningful weight,
+define it by mass with `serving_size` set to the weight of one unit, and log
+counts as `serving`.** A chocolate square becomes `serving_size 8, serving_unit
+g`, so `20 g` and `3 serving` both resolve and reconcile with each other.
+
+Reserve `piece` for foods with no useful weight in practice — an egg, a banana,
+a rice cake. Getting this wrong is a one-way door: the fix is a new food and a
+manual re-point of past meal_items.
+
 **Meal_item edits stay local.**
 - `meal_item.quantity` — you ate what you ate that day
 - `meal_item.food_id` — swap the food, only affects that meal
@@ -923,6 +939,7 @@ Establishes backups actually work.
 - **Supplements.** Similar shape to hydration — timing more than macros. Possibly just tags on meals.
 - **Meal photos.** Attach photo to a meal for later reference. R2 storage, URL on meal row. No macro extraction from photo — Claude reads in-context when needed.
 - **Barcode lookup.** Open Food Facts as a fallback. Adds `barcode` column to `foods` and a lookup MCP tool.
+- **`foods.grams_per_piece`.** A nullable column bridging count to mass, mirroring what `density_g_per_ml` does for volume. Deferred from v1: the convention above covers the common case, and the residual gap is narrow — a food whose serving is several pieces, logged as a different count. Add the column and one branch in `normalize_to_grams` if that case shows up in practice.
 
 ### Behavior questions to revisit after a month of use
 
