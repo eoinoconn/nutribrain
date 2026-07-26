@@ -11,11 +11,15 @@ from app.domain.dto import (
     MealItemResponse,
     MealItemSpec,
     MealResponse,
+    TemplateItemResponse,
+    TemplateItemSpec,
+    TemplateResponse,
 )
 from app.domain.errors import (
     DomainError,
     FoodAmbiguousError,
     FoodNotFoundError,
+    TemplateNotFoundError,
 )
 from app.domain.food_resolution import resolve_food
 from app.domain.meal_logging import log_meal
@@ -24,6 +28,13 @@ from app.domain.nutrition_math import (
     UnitNormalizationError,
     compute_item_macros,
     normalize_to_grams,
+)
+from app.domain.templates import (
+    create_template,
+    delete_template,
+    list_templates,
+    log_template,
+    update_template,
 )
 
 __all__ = [
@@ -36,12 +47,21 @@ __all__ = [
     "MealItemResponse",
     "MealItemSpec",
     "MealResponse",
+    "TemplateItemResponse",
+    "TemplateItemSpec",
+    "TemplateNotFoundError",
+    "TemplateResponse",
     "UnitNormalizationError",
     "compute_item_macros",
+    "create_template",
+    "delete_template",
     "infer_meal_type",
+    "list_templates",
     "log_meal",
+    "log_template",
     "normalize_to_grams",
     "parse_local_date",
     "resolve_food",
     "resolve_meal_type",
+    "update_template",
 ]

@@ -72,3 +72,49 @@ class MealItemResponse:
     quantity_unit: QuantityUnit
     source: MealItemSource
     macros: ItemMacros
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateItemSpec:
+    """Input spec for a single template item."""
+
+    name: str
+    quantity: Decimal
+    quantity_unit: QuantityUnit
+    food_id: int | None = None
+    calories: Decimal | None = None
+    protein_g: Decimal | None = None
+    carbs_g: Decimal | None = None
+    fat_g: Decimal | None = None
+    fiber_g: Decimal | None = None
+    sat_fat_g: Decimal | None = None
+    sodium_mg: Decimal | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateItemResponse:
+    """A single item within a template."""
+
+    id: int
+    food_id: int | None
+    name: str
+    quantity: Decimal
+    quantity_unit: QuantityUnit
+    calories: Decimal | None
+    protein_g: Decimal | None
+    carbs_g: Decimal | None
+    fat_g: Decimal | None
+    fiber_g: Decimal | None
+    sat_fat_g: Decimal | None
+    sodium_mg: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateResponse:
+    """A template with its items."""
+
+    id: int
+    name: str
+    created_at: datetime
+    deleted_at: datetime | None
+    items: list[TemplateItemResponse]

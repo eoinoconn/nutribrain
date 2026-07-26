@@ -38,3 +38,13 @@ class FoodAmbiguousError(DomainError):
             message=f"Multiple foods match '{name}'. Specify one.",
             candidates=candidates,
         )
+
+
+class TemplateNotFoundError(DomainError):
+    """Template could not be found by id or name."""
+
+    def __init__(self, identifier: str | int) -> None:
+        super().__init__(
+            error="template_not_found",
+            message=f"No template found for '{identifier}'.",
+        )
