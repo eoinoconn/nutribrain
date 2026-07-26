@@ -52,20 +52,20 @@ following to your Claude Desktop configuration file:
         "mcp-remote",
         "https://nutrition-api.onrender.com/mcp",
         "--header",
-        "Authorization: ******"
+        "Authorization: Bearer <token>"
       ]
     }
   }
 }
 ```
 
-Replace `<YOUR_APP_TOKEN>` with the token stored in your deployment environment.
+Replace `<token>` with your actual `APP_TOKEN` value.
 
 ### How it works
 
 1. Claude Desktop spawns `npx mcp-remote` as a local stdio process.
 2. `mcp-remote` opens an HTTP connection to the remote `/mcp` endpoint.
-3. Every request includes the `Authorization: ****** header.
+3. Every request includes the `Authorization: Bearer <token>` header.
 4. The NutriBrain `AuthMiddleware` validates the token before the request
    reaches the MCP session layer.
 
@@ -98,7 +98,7 @@ local `mcp-remote` bridge.
 | Server URL | `https://nutrition-api.onrender.com/mcp` |
 | Authentication | Header-based |
 | Header name | `Authorization` |
-| Header value | `****** |
+| Header value | `Bearer <token>` |
 
 4. Save and verify — start a conversation and ask Claude to list available
    nutrition tools.
@@ -137,7 +137,7 @@ Rotate the token periodically or immediately if you suspect compromise.
 
 4. **Update Claude web/mobile connector:**
    - Open Claude settings → Connectors → `NutriBrain` → edit.
-   - Replace the header value with `******
+   - Replace the header value with `Bearer <new_token>`
    - Save.
 
 5. **Update the web dashboard:**
@@ -162,7 +162,7 @@ Rotate the token periodically or immediately if you suspect compromise.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| 401 on every request | Token mismatch or missing `****** prefix | Verify the token matches `APP_TOKEN` on the server; ensure the header value starts with `****** (with a space) |
+| 401 on every request | Token mismatch or missing `Bearer ` prefix | Verify the token matches `APP_TOKEN` on the server; ensure the header value starts with `Bearer ` (with a space) |
 | `mcp-remote` not found | Node.js/npx not in PATH | Install Node.js 18+ and ensure `npx` is available |
 | Connection timeout | Server not running or wrong URL | Verify the server is deployed; check the URL includes `/mcp` |
 | Tools not listed in Claude | Config not loaded | Restart Claude Desktop; verify JSON syntax in config file |
