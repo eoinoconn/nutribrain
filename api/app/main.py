@@ -11,6 +11,7 @@ from fastmcp import FastMCP
 
 from app import settings as settings_module
 from app.api.foods import router as foods_router
+from app.api.targets import router as targets_router
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
@@ -98,6 +99,7 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(foods_router)
+    app.include_router(targets_router)
 
     if include_mcp_mount:
         # Mounted last: Mount("/", ...) matches every path, so routes defined above it

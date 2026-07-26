@@ -18,6 +18,7 @@ from app.domain.dto import (
     PeriodTotals,
     RangeResponse,
     SetTargetResult,
+    TargetRow,
     TemplateItemResponse,
     TemplateItemSpec,
     TemplateResponse,
@@ -53,7 +54,7 @@ from app.domain.nutrition_math import (
     compute_item_macros,
     normalize_to_grams,
 )
-from app.domain.targets import get_effective_target, set_target
+from app.domain.targets import get_effective_target, list_targets, set_target
 from app.domain.templates import (
     create_template,
     delete_template,
@@ -85,6 +86,7 @@ __all__ = [
     "RangeResponse",
     "ServingUnitImmutableError",
     "SetTargetResult",
+    "TargetRow",
     "TemplateItemResponse",
     "TemplateItemSpec",
     "TemplateNotFoundError",
@@ -103,6 +105,7 @@ __all__ = [
     "get_effective_target",
     "get_range",
     "infer_meal_type",
+    "list_targets",
     "list_templates",
     "log_meal",
     "log_template",

@@ -152,6 +152,19 @@ class SetTargetResult:
 
 
 @dataclass(frozen=True, slots=True)
+class TargetRow:
+    """A single target row for listing the versioned history."""
+
+    id: int
+    effective_from: date
+    base_calories: int
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class DayMealGroup:
     """A meal with computed items and totals, for the day view."""
 
