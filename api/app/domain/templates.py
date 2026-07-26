@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import (
@@ -107,8 +107,8 @@ def delete_template(
     return _template_to_response(template)
 
 
-def list_templates(session: Session) -> list[TemplateResponse]:
-    """Return all non-deleted templates with their items in full."""
+def list_templates(session: Session, *, query: str = "") -> list[TemplateResponse]:
+    """Return non-deleted templates, optionally filtered by name substring."""
 
     stmt = (
         select(Template)
@@ -116,6 +116,11 @@ def list_templates(session: Session) -> list[TemplateResponse]:
         .options(selectinload(Template.items))
         .order_by(Template.id)
     )
+
+    lowered = query.strip().lower()
+    if lowered:
+        stmt = stmt.where(func.lower(Template.name).contains(lowered))
+
     templates = session.scalars(stmt).all()
     return [_template_to_response(t) for t in templates]
 
