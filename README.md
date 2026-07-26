@@ -11,6 +11,28 @@ See [docs/spec.md](docs/spec.md) for the full technical specification.
 
 ---
 
+## Make targets
+
+A root `Makefile` wraps the common tasks and mirrors the CI pipeline. Run `make`
+(or `make help`) to list every target. The most useful ones:
+
+```bash
+make install        # Install api/ and web/ dependencies
+make check          # Run the full CI gate locally (lint, typecheck, migrations, tests, build)
+make lint           # Ruff check + format-check (api) and ESLint (web)
+make typecheck      # mypy (api) and tsc (web)
+make test           # pytest (api) and vitest (web)
+make migrate        # Apply Alembic migrations to head
+make migrate-check  # Apply migrations and assert models match (no drift)
+```
+
+`make check`, `make migrate`, and `make migrate-check` need a reachable Postgres
+(`DATABASE_URL` in `api/.env` or the environment); all other targets run without
+a database. The individual commands each target wraps are documented in the
+sections below.
+
+---
+
 ## Quick start
 
 ### Prerequisites

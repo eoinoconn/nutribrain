@@ -5,6 +5,11 @@ NutriBrain is a single-user nutrition tracker. One Python service hosts both a F
 
 ## Quick Commands
 
+A root `Makefile` wraps these tasks — run `make help` to list targets. `make check`
+runs the full CI gate (lint, typecheck, migrations, tests, build); `make migrate`
+and `make migrate-check` need a reachable Postgres. The per-project commands it
+wraps are below.
+
 ### API (`api/`)
 - Install deps: `uv sync --all-groups`
 - Dev server: `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
