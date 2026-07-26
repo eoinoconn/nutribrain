@@ -72,3 +72,59 @@ class MealItemResponse:
     quantity_unit: QuantityUnit
     source: MealItemSource
     macros: ItemMacros
+
+
+@dataclass(frozen=True, slots=True)
+class EffectiveTarget:
+    """Effective target for a day with base + calories_out breakdown."""
+
+    base_calories: int
+    calories_out: int | None
+    effective_calories: Decimal
+    protein_g: int
+    carbs_g: int
+    fat_g: int
+
+
+@dataclass(frozen=True, slots=True)
+class DayMealGroup:
+    """A meal with computed items and totals, for the day view."""
+
+    id: int
+    logged_at: datetime
+    meal_type: MealType
+    notes: str | None
+    items: list[MealItemResponse]
+    totals: ItemMacros
+
+
+@dataclass(frozen=True, slots=True)
+class DayResponse:
+    """Full day aggregation: meals grouped by type, totals, target, delta."""
+
+    date: date
+    meals: dict[MealType, list[DayMealGroup]]
+    day_totals: ItemMacros
+    effective_target: EffectiveTarget | None
+    delta_vs_target: ItemMacros | None
+
+
+@dataclass(frozen=True, slots=True)
+class PeriodTotals:
+    """Per-period totals for range aggregation."""
+
+    period_start: date
+    period_end: date
+    totals: ItemMacros
+    effective_target: EffectiveTarget | None
+    adherence: bool | None  # None if no target; True if calories <= effective target
+
+
+@dataclass(frozen=True, slots=True)
+class RangeResponse:
+    """Range aggregation with per-period totals and targets."""
+
+    from_date: date
+    to_date: date
+    granularity: str  # "day" or "week"
+    periods: list[PeriodTotals]

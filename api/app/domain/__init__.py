@@ -5,12 +5,18 @@ implemented in one place.
 """
 
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
+from app.domain.day_aggregation import get_day, get_range
 from app.domain.dto import (
+    DayMealGroup,
+    DayResponse,
+    EffectiveTarget,
     FoodCandidate,
     ItemMacros,
     MealItemResponse,
     MealItemSpec,
     MealResponse,
+    PeriodTotals,
+    RangeResponse,
 )
 from app.domain.errors import (
     DomainError,
@@ -28,7 +34,10 @@ from app.domain.nutrition_math import (
 
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
+    "DayMealGroup",
+    "DayResponse",
     "DomainError",
+    "EffectiveTarget",
     "FoodAmbiguousError",
     "FoodCandidate",
     "FoodNotFoundError",
@@ -36,8 +45,12 @@ __all__ = [
     "MealItemResponse",
     "MealItemSpec",
     "MealResponse",
+    "PeriodTotals",
+    "RangeResponse",
     "UnitNormalizationError",
     "compute_item_macros",
+    "get_day",
+    "get_range",
     "infer_meal_type",
     "log_meal",
     "normalize_to_grams",
