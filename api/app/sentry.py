@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.types import Event, Hint
 
 from app.settings import settings
@@ -38,4 +39,5 @@ def init_sentry() -> None:
         dsn=settings.sentry_dsn,
         send_default_pii=False,
         before_send=_before_send,
+        integrations=[FastApiIntegration()],
     )
