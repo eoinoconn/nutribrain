@@ -14,6 +14,11 @@ from app.api.foods import router as foods_router
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
+from app.logging import configure_logging
+from app.middleware import RequestLoggingMiddleware
+
+# Configure structured logging on import (before any logger is used)
+configure_logging(settings_module.settings.log_level)
 
 ERROR_STATUS_BY_CODE: dict[str, int] = {
     "unauthorized": 401,
@@ -40,8 +45,7 @@ def _validate_startup_settings() -> None:
     if blank:
         fields = ", ".join(sorted(blank))
         raise RuntimeError(
-            "Invalid environment configuration: "
-            f"blank required setting(s): {fields}"
+            f"Invalid environment configuration: blank required setting(s): {fields}"
         )
 
 
@@ -74,6 +78,7 @@ async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONRespo
         content=jsonable_encoder(_domain_error_payload(exc)),
     )
 
+
 mcp = FastMCP("nutribrain")
 mcp_app = mcp.http_app(path="/mcp")
 
@@ -81,8 +86,10 @@ mcp_app = mcp.http_app(path="/mcp")
 def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
     app = FastAPI(title="nutribrain", lifespan=_lifespan)
 
-    # Added last so it sits outermost and handles CORS preflight (OPTIONS, sent
-    # without an Authorization header) before AuthMiddleware ever sees it.
+    # Middleware order (last added = outermost in ASGI):
+    # 1. AuthMiddleware — rejects unauthenticated requests
+    # 2. CORSMiddleware — handles preflight before auth sees OPTIONS
+    # 3. RequestLoggingMiddleware — outermost; binds request_id, logs slow requests
     app.add_middleware(AuthMiddleware, token=settings_module.settings.app_token)
     app.add_middleware(
         CORSMiddleware,
@@ -90,6 +97,7 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     app.add_exception_handler(DomainError, _handle_domain_error)
 
@@ -105,5 +113,6 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         app.mount("/", mcp_app)
 
     return app
+
 
 app = create_app()
