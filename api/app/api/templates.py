@@ -22,7 +22,7 @@ from app.domain import (
     log_template,
     update_template,
 )
-from app.domain.dto import ItemMacros, MealResponse, TemplateResponse
+from app.domain.dto import ItemMacros, MealResponse, TemplateItemSpec, TemplateResponse
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
 DbSession = Annotated[Session, Depends(get_session)]
@@ -192,6 +192,25 @@ def _meal_response_to_out(meal: MealResponse) -> MealOut:
     )
 
 
+def _items_to_specs(items: list[TemplateItemRequest]) -> list[TemplateItemSpec]:
+    return [
+        TemplateItemSpec(
+            name=item.name,
+            quantity=item.quantity,
+            quantity_unit=item.quantity_unit,
+            food_id=item.food_id,
+            calories=item.calories,
+            protein_g=item.protein_g,
+            carbs_g=item.carbs_g,
+            fat_g=item.fat_g,
+            fiber_g=item.fiber_g,
+            sat_fat_g=item.sat_fat_g,
+            sodium_mg=item.sodium_mg,
+        )
+        for item in items
+    ]
+
+
 # --- Routes -----------------------------------------------------------------
 
 
@@ -206,25 +225,7 @@ def create_new_template(
     payload: CreateTemplateRequest,
     session: DbSession,
 ) -> TemplateOut:
-    from app.domain.dto import TemplateItemSpec
-
-    items = [
-        TemplateItemSpec(
-            name=item.name,
-            quantity=item.quantity,
-            quantity_unit=item.quantity_unit,
-            food_id=item.food_id,
-            calories=item.calories,
-            protein_g=item.protein_g,
-            carbs_g=item.carbs_g,
-            fat_g=item.fat_g,
-            fiber_g=item.fiber_g,
-            sat_fat_g=item.sat_fat_g,
-            sodium_mg=item.sodium_mg,
-        )
-        for item in payload.items
-    ]
-    result = create_template(session, name=payload.name, items=items)
+    result = create_template(session, name=payload.name, items=_items_to_specs(payload.items))
     return _template_response_to_out(result)
 
 
@@ -234,26 +235,7 @@ def patch_template(
     template_id: Annotated[int, Path(ge=1)],
     session: DbSession,
 ) -> TemplateOut:
-    from app.domain.dto import TemplateItemSpec
-
-    items: list[TemplateItemSpec] | None = None
-    if payload.items is not None:
-        items = [
-            TemplateItemSpec(
-                name=item.name,
-                quantity=item.quantity,
-                quantity_unit=item.quantity_unit,
-                food_id=item.food_id,
-                calories=item.calories,
-                protein_g=item.protein_g,
-                carbs_g=item.carbs_g,
-                fat_g=item.fat_g,
-                fiber_g=item.fiber_g,
-                sat_fat_g=item.sat_fat_g,
-                sodium_mg=item.sodium_mg,
-            )
-            for item in payload.items
-        ]
+    items = _items_to_specs(payload.items) if payload.items is not None else None
     result = update_template(
         session,
         template_id=template_id,
