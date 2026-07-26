@@ -158,6 +158,40 @@ npm run lint                      # ESLint + Prettier
 
 ## Database
 
+### Neon branch workflow
+
+The shared database lives on Neon (free tier). Rather than run a local Postgres,
+give each developer and each environment its own **branch** — they are free,
+instant, and copy-on-write from the parent, so every branch starts with the
+current schema and data.
+
+1. **Provision once.** Create the Neon project (`nutribrain`) and pin compute to
+   **0.25 CU** in the console to keep scale-to-zero cheap. Record two connection
+   strings from the dashboard:
+   - the **pooled** string (host contains `-pooler`) — use this for the app and
+     `DATABASE_URL`; PgBouncer absorbs the connection churn from scale-to-zero;
+   - the **direct** string — only for tools that need a non-pooled session.
+2. **Branch per environment.** In the Neon console (or `neonctl branches create`),
+   create a branch off `main` for each dev/preview environment, e.g.
+   `dev-<name>`. Copy that branch's pooled connection string.
+3. **Point the app at your branch.** Put the pooled string in `api/.env`:
+
+   ```bash
+   DATABASE_URL=postgresql+psycopg://<user>:<pass>@ep-...-pooler.<region>.aws.neon.tech/nutribrain?sslmode=require
+   ```
+
+4. **Migrate and verify.** From `api/`, run `uv run alembic upgrade head`, start
+   the server, and hit `/health` — it returns `{"status": "ok"}` without touching
+   the database, so uptime checks never hold the endpoint awake.
+5. **Reset cheaply.** Delete and recreate a branch to get a clean schema; the
+   parent is untouched.
+
+**Connection pooling.** The engine ([api/app/db/engine.py](api/app/db/engine.py))
+applies the G6 settings from [docs/decisions.md](docs/decisions.md): `pool_pre_ping`
+(reconnect transparently after Neon suspends the endpoint), `pool_recycle=300`
+(retire connections before Neon does), and `pool_size=2` (single user). There is
+no keep-alive ping — cold starts of a few hundred milliseconds are accepted.
+
 ### Local Postgres (Docker)
 
 For running tests and migrations locally without a Neon branch, start a throwaway

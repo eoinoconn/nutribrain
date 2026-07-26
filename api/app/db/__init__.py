@@ -1,4 +1,5 @@
 from app.db.base import Base
+from app.db.engine import SessionLocal, engine, get_session
 from app.db.models import (
     Food,
     IntervalsCaloriesOut,
@@ -25,7 +26,10 @@ __all__ = [
     "MealType",
     "QuantityUnit",
     "ServingUnit",
+    "SessionLocal",
     "Target",
     "Template",
     "TemplateItem",
+    "engine",
+    "get_session",
 ]
