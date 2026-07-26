@@ -14,7 +14,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import IntervalsCaloriesOut, Target
-from app.domain.dto import EffectiveTarget, SetTargetResult
+from app.domain.dto import EffectiveTarget, SetTargetResult, TargetRow
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def set_target(
@@ -46,6 +49,8 @@ def set_target(
     session.add(target)
     session.flush()
 
+    logger.info("target_set", target_id=target.id, effective_from=str(target.effective_from))
+
     return SetTargetResult(
         id=target.id,
         effective_from=target.effective_from,
@@ -55,6 +60,25 @@ def set_target(
         fat_g=target.fat_g,
         same_day_overlap=same_day_overlap,
     )
+
+
+def list_targets(session: Session) -> list[TargetRow]:
+    """Return all targets ordered by effective_from descending (versioned history)."""
+
+    stmt = select(Target).order_by(Target.effective_from.desc(), Target.id.desc())
+    targets = session.scalars(stmt).all()
+    return [
+        TargetRow(
+            id=t.id,
+            effective_from=t.effective_from,
+            base_calories=t.base_calories,
+            protein_g=t.protein_g,
+            carbs_g=t.carbs_g,
+            fat_g=t.fat_g,
+            created_at=t.created_at,
+        )
+        for t in targets
+    ]
 
 
 def get_effective_target(
