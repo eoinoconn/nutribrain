@@ -17,8 +17,8 @@ from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
 from app.logging import configure_logging
-from app.middleware import RequestLoggingMiddleware
 from app.mcp import register_all_tools
+from app.middleware import RequestLoggingMiddleware
 from app.sentry import init_sentry
 
 # Configure structured logging on import (before any logger is used)

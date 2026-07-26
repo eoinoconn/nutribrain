@@ -31,9 +31,7 @@ def resolve_food(
         raise ValueError("now must be timezone-aware")
 
     if food_id is not None:
-        resolved = session.scalar(
-            select(Food).where(Food.id == food_id, Food.deleted_at.is_(None))
-        )
+        resolved = session.scalar(select(Food).where(Food.id == food_id, Food.deleted_at.is_(None)))
         if resolved is None:
             raise FoodNotFoundError(name or f"id:{food_id}")
         return resolved

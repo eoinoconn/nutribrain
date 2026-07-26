@@ -44,9 +44,7 @@ def register_sync_tools(mcp: FastMCP) -> None:
             )
 
         # The concrete integration is implemented in T-061.
-        error = IntervalsUnavailableError(
-            "Intervals sync is not implemented yet in this scaffold."
-        )
+        error = IntervalsUnavailableError("Intervals sync is not implemented yet in this scaffold.")
         tool_error = serialize_domain_error(error)
         _ = (resolved_from, resolved_to)
         return tool_error

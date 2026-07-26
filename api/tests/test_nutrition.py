@@ -38,9 +38,7 @@ class FakeMealItem:
 
 
 _COMBINATION_CASES = [
-    (quantity_unit, food_unit)
-    for quantity_unit in QuantityUnit
-    for food_unit in ServingUnit
+    (quantity_unit, food_unit) for quantity_unit in QuantityUnit for food_unit in ServingUnit
 ]
 
 
@@ -57,12 +55,9 @@ def test_normalize_to_grams_all_quantity_and_serving_unit_combinations(
     )
 
     should_raise = (
-        (
-            food_unit == ServingUnit.piece
-            and quantity_unit not in {QuantityUnit.piece, QuantityUnit.serving}
-        )
-        or (quantity_unit == QuantityUnit.piece and food_unit != ServingUnit.piece)
-    )
+        food_unit == ServingUnit.piece
+        and quantity_unit not in {QuantityUnit.piece, QuantityUnit.serving}
+    ) or (quantity_unit == QuantityUnit.piece and food_unit != ServingUnit.piece)
 
     if should_raise:
         with pytest.raises(UnitNormalizationError):

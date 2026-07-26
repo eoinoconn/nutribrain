@@ -209,9 +209,7 @@ def serialize_meal(value: MealResponse) -> MealModel:
         items=[serialize_meal_item(item) for item in value.items],
         totals=serialize_macros(value.totals),
         delta_vs_target=(
-            serialize_macros(value.delta_vs_target)
-            if value.delta_vs_target is not None
-            else None
+            serialize_macros(value.delta_vs_target) if value.delta_vs_target is not None else None
         ),
     )
 
@@ -292,9 +290,7 @@ def serialize_day(value: DayResponse) -> DayModel:
             else None
         ),
         delta_vs_target=(
-            serialize_macros(value.delta_vs_target)
-            if value.delta_vs_target is not None
-            else None
+            serialize_macros(value.delta_vs_target) if value.delta_vs_target is not None else None
         ),
     )
 
