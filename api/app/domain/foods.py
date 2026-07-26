@@ -11,16 +11,19 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.db import Food, MealItem, ServingUnit
+from app.db import Food, Meal, MealItem, ServingUnit
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
 from app.domain.errors import (
     FoodDuplicateError,
     FoodNotFoundError,
     ServingUnitImmutableError,
 )
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +35,13 @@ class AddFoodResult:
 class UpdateFoodResult:
     food: Food
     affected_meals_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class FoodSearchResult:
+    food: Food
+    last_logged_at: datetime | None
+    logged_count: int
 
 
 # Sentinel for distinguishing "not passed" from "explicitly passed None"
@@ -86,6 +96,7 @@ def add_food(
     )
     session.add(food)
     session.flush()
+    logger.info("food_added", food_id=food.id, name=food.name)
     return AddFoodResult(food=food)
 
 
@@ -142,6 +153,7 @@ def update_food(
     session.flush()
 
     affected_meals_count = _count_affected_meals(session, food_id)
+    logger.info("food_updated", food_id=food_id, affected_meals_count=affected_meals_count)
     return UpdateFoodResult(food=food, affected_meals_count=affected_meals_count)
 
 
@@ -178,7 +190,86 @@ def delete_food(
         now = datetime.now(UTC)
     food.deleted_at = now
     session.flush()
+    logger.info("food_deleted", food_id=food_id)
     return food
+
+
+def search_foods(
+    session: Session,
+    *,
+    query: str,
+    limit: int = 20,
+) -> list[FoodSearchResult]:
+    """Search non-deleted foods by fuzzy name with usage metadata.
+
+    Returns favorite marker + ``last_logged_at``/``logged_count`` (G3) for each
+    candidate. The usage stats are computed in-query, never stored.
+    """
+
+    lowered_query = query.strip().lower()
+    stats_subquery = (
+        select(
+            MealItem.food_id.label("food_id"),
+            func.max(Meal.logged_at).label("last_logged_at"),
+            func.count(MealItem.id).label("logged_count"),
+        )
+        .join(Meal, Meal.id == MealItem.meal_id)
+        .where(MealItem.food_id.is_not(None))
+        .group_by(MealItem.food_id)
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Food,
+            stats_subquery.c.last_logged_at,
+            func.coalesce(stats_subquery.c.logged_count, 0).label("logged_count"),
+        )
+        .outerjoin(stats_subquery, stats_subquery.c.food_id == Food.id)
+        .where(Food.deleted_at.is_(None))
+    )
+
+    if lowered_query:
+        exact_match = func.lower(Food.name) == lowered_query
+        has_trigram_similarity = session.scalar(select(func.to_regproc("similarity"))) is not None
+        if has_trigram_similarity:
+            similarity = func.similarity(func.lower(Food.name), lowered_query)
+            stmt = (
+                stmt.where(
+                    exact_match
+                    | (similarity >= FOOD_NAME_SIMILARITY_THRESHOLD)
+                    | func.lower(Food.name).contains(lowered_query)
+                )
+                .order_by(
+                    case((exact_match, 1), else_=0).desc(),
+                    similarity.desc(),
+                    Food.is_favorite.desc(),
+                    Food.name.asc(),
+                )
+                .limit(limit)
+            )
+        else:
+            stmt = (
+                stmt.where(exact_match | func.lower(Food.name).contains(lowered_query))
+                .order_by(
+                    case((exact_match, 1), else_=0).desc(),
+                    Food.is_favorite.desc(),
+                    Food.name.asc(),
+                )
+                .limit(limit)
+            )
+    else:
+        stmt = stmt.order_by(Food.is_favorite.desc(), Food.name.asc()).limit(limit)
+
+    rows = session.execute(stmt).all()
+    return [
+        FoodSearchResult(
+            food=row[0],
+            last_logged_at=row[1],
+            logged_count=int(row[2]),
+        )
+        for row in rows
+    ]
 
 
 # --- Internal helpers -------------------------------------------------------

@@ -15,6 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.db import IntervalsCaloriesOut, Target
 from app.domain.dto import EffectiveTarget, SetTargetResult
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def set_target(
@@ -45,6 +48,8 @@ def set_target(
     )
     session.add(target)
     session.flush()
+
+    logger.info("target_set", target_id=target.id, effective_from=str(target.effective_from))
 
     return SetTargetResult(
         id=target.id,

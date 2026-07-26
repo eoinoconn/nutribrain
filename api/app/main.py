@@ -4,15 +4,22 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastmcp import FastMCP
 
 from app import settings as settings_module
+from app.api.foods import router as foods_router
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
 from app.sentry import init_sentry
+from app.logging import configure_logging
+from app.middleware import RequestLoggingMiddleware
+
+# Configure structured logging on import (before any logger is used)
+configure_logging(settings_module.settings.log_level)
 
 ERROR_STATUS_BY_CODE: dict[str, int] = {
     "unauthorized": 401,
@@ -70,7 +77,7 @@ def _domain_error_payload(exc: DomainError) -> dict[str, object]:
 async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(
         status_code=_status_for_domain_error(exc.error),
-        content=_domain_error_payload(exc),
+        content=jsonable_encoder(_domain_error_payload(exc)),
     )
 
 
@@ -81,8 +88,10 @@ mcp_app = mcp.http_app(path="/mcp")
 def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
     app = FastAPI(title="nutribrain", lifespan=_lifespan)
 
-    # Added last so it sits outermost and handles CORS preflight (OPTIONS, sent
-    # without an Authorization header) before AuthMiddleware ever sees it.
+    # Middleware order (last added = outermost in ASGI):
+    # 1. AuthMiddleware — rejects unauthenticated requests
+    # 2. CORSMiddleware — handles preflight before auth sees OPTIONS
+    # 3. RequestLoggingMiddleware — outermost; binds request_id, logs slow requests
     app.add_middleware(AuthMiddleware, token=settings_module.settings.app_token)
     app.add_middleware(
         CORSMiddleware,
@@ -90,12 +99,15 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     app.add_exception_handler(DomainError, _handle_domain_error)
 
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    app.include_router(foods_router)
 
     if include_mcp_mount:
         # Mounted last: Mount("/", ...) matches every path, so routes defined above it
