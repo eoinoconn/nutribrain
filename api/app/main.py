@@ -12,6 +12,7 @@ from app import settings as settings_module
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
+from app.sentry import init_sentry
 
 ERROR_STATUS_BY_CODE: dict[str, int] = {
     "unauthorized": 401,
@@ -38,8 +39,7 @@ def _validate_startup_settings() -> None:
     if blank:
         fields = ", ".join(sorted(blank))
         raise RuntimeError(
-            "Invalid environment configuration: "
-            f"blank required setting(s): {fields}"
+            f"Invalid environment configuration: blank required setting(s): {fields}"
         )
 
 
@@ -48,6 +48,7 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Compose startup/shutdown for both FastAPI and mounted FastMCP apps."""
 
     _validate_startup_settings()
+    init_sentry()
     # Ensure the process-wide engine is initialized during startup.
     _ = engine
     async with mcp_app.lifespan(app):
@@ -71,6 +72,7 @@ async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONRespo
         status_code=_status_for_domain_error(exc.error),
         content=_domain_error_payload(exc),
     )
+
 
 mcp = FastMCP("nutribrain")
 mcp_app = mcp.http_app(path="/mcp")
@@ -101,5 +103,6 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         app.mount("/", mcp_app)
 
     return app
+
 
 app = create_app()
