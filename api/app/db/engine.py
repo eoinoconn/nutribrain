@@ -19,7 +19,8 @@ milliseconds are accepted rather than holding compute awake around the clock.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -52,15 +53,39 @@ engine: Engine = _create_engine()
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def get_session() -> Iterator[Session]:
-    """Yield a session bound to the shared engine, closed on teardown.
+@contextmanager
+def session_scope() -> Generator[Session, None, None]:
+    """Yield a session wrapped in one transaction, closed on teardown.
 
-    Suitable as a FastAPI dependency and as a context boundary for the cron
-    worker. The domain layer receives the session but never owns its lifecycle.
+    This is the transaction boundary: ``Session.begin`` commits on a clean exit
+    and rolls back on any exception, so mutation tools follow the
+    immediate-commit model from the spec (``docs/spec.md`` §"Commit model") and
+    a failed multi-step mutation never partially commits.
+
+    Use it directly from the MCP tools and the cron worker::
+
+        with session_scope() as session:
+            log_meal(session, ...)
+
+    FastAPI routes get the same boundary via :func:`get_session`.
     """
 
     session = SessionLocal()
     try:
-        yield session
+        with session.begin():
+            yield session
     finally:
         session.close()
+
+
+def get_session() -> Iterator[Session]:
+    """FastAPI dependency delegating to :func:`session_scope`.
+
+    Note that FastAPI resumes a ``yield`` dependency *after* the response has
+    been sent, so a failing ``COMMIT`` here cannot change the status code the
+    client already received. Non-HTTP callers should use :func:`session_scope`
+    directly, where the error propagates normally.
+    """
+
+    with session_scope() as session:
+        yield session
