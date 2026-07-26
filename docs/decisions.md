@@ -104,6 +104,24 @@ FastAPI's `dependencies=[Depends(require_auth)]` on a router **does not** apply 
 
 ## Questions and future amendments
 
+### D-002 — Fuzzy food-match similarity threshold (2026-07-26)
+
+**Decision:** `resolve_food` uses a trigram similarity threshold of `0.35` via
+`pg_trgm` (`similarity(lower(foods.name), lower(query)) >= 0.35`).
+
+**Why this value:**
+- It accepts common minor typos and punctuation drift (`"brennan bagel"` vs
+  `"Brennans Bagel"`) without requiring exact tokenization.
+- It avoids broad, low-quality matches that trigger accidental auto-selection
+  and therefore violate the ambiguity-escalation rule.
+
+**Implementation notes:**
+- Resolution first attempts exact case-insensitive equality using
+  `lower(name)` (aligned with `ix_foods_lower_name`), then applies trigram
+  matching with the threshold above.
+- Soft-deleted foods (`deleted_at IS NOT NULL`) are excluded from every
+  candidate query.
+
 ### D-001 — Production image must provide `libpq` (2026-07-26)
 
 **Context:** The runtime dependency is plain `psycopg` (pure-Python implementation), pinned in `api/uv.lock`. That implementation links against the system `libpq` shared library at runtime; it does **not** bundle one.
