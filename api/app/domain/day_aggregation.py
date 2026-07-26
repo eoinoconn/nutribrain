@@ -252,7 +252,7 @@ def _get_effective_targets_for_range(
             select(Target)
             .where(Target.effective_from <= to_date)
             .order_by(Target.effective_from.desc())
-        ).all()
+        )
     )
 
     if not targets:
@@ -265,7 +265,7 @@ def _get_effective_targets_for_range(
                 IntervalsCaloriesOut.date >= from_date,
                 IntervalsCaloriesOut.date <= to_date,
             )
-        ).all()
+        )
     )
     calories_out_map = {row.date: row.calories_out for row in calories_out_rows}
 
