@@ -11,6 +11,7 @@ from fastmcp import FastMCP
 
 from app import settings as settings_module
 from app.api.foods import router as foods_router
+from app.api.templates import router as templates_router
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
@@ -40,8 +41,7 @@ def _validate_startup_settings() -> None:
     if blank:
         fields = ", ".join(sorted(blank))
         raise RuntimeError(
-            "Invalid environment configuration: "
-            f"blank required setting(s): {fields}"
+            f"Invalid environment configuration: blank required setting(s): {fields}"
         )
 
 
@@ -74,6 +74,7 @@ async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONRespo
         content=jsonable_encoder(_domain_error_payload(exc)),
     )
 
+
 mcp = FastMCP("nutribrain")
 mcp_app = mcp.http_app(path="/mcp")
 
@@ -98,6 +99,7 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(foods_router)
+    app.include_router(templates_router)
 
     if include_mcp_mount:
         # Mounted last: Mount("/", ...) matches every path, so routes defined above it
@@ -105,5 +107,6 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         app.mount("/", mcp_app)
 
     return app
+
 
 app = create_app()
