@@ -37,9 +37,11 @@ from app.domain.errors import (
 from app.domain.food_resolution import resolve_food
 from app.domain.foods import (
     AddFoodResult,
+    FoodSearchResult,
     UpdateFoodResult,
     add_food,
     delete_food,
+    search_foods,
     set_favorite_food,
     update_food,
 )
@@ -71,6 +73,7 @@ __all__ = [
     "FoodCandidate",
     "FoodDuplicateError",
     "FoodNotFoundError",
+    "FoodSearchResult",
     "IntervalsUnavailableError",
     "ItemMacros",
     "MealItemNotFoundError",
@@ -107,6 +110,7 @@ __all__ = [
     "parse_local_date",
     "resolve_food",
     "resolve_meal_type",
+    "search_foods",
     "set_favorite_food",
     "set_target",
     "update_food",
