@@ -39,7 +39,9 @@ sections below.
 
 - Python 3.12+ (managed with `uv`)
 - Node.js 18+ (with `npm`)
+- A Postgres database — a Neon branch (see below) or a local Docker container
 - Neon account (free tier) and one `DATABASE_URL` connection string
+- Docker (optional, for a local Postgres — matches the CI image)
 - intervals.icu credentials (optional for cron)
 
 ### Local development
@@ -155,6 +157,28 @@ npm run lint                      # ESLint + Prettier
 ---
 
 ## Database
+
+### Local Postgres (Docker)
+
+For running tests and migrations locally without a Neon branch, start a throwaway
+Postgres matching the CI image:
+
+```bash
+docker run -d --name nutribrain-pg \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=nutribrain \
+  -p 5432:5432 postgres:16
+```
+
+Then point the API at it (in `api/.env` or the shell):
+
+```bash
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/nutribrain
+```
+
+The pure `psycopg` build needs the system `libpq` library present (see
+[docs/decisions.md](docs/decisions.md) — D-001); on Debian/Ubuntu:
+`sudo apt install libpq5`. Remove the container with
+`docker rm -f nutribrain-pg` when done.
 
 ### Migrations
 
