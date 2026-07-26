@@ -11,10 +11,19 @@ from fastmcp import FastMCP
 
 from app import settings as settings_module
 from app.api.foods import router as foods_router
+from app.api.meals import router as meals_router
 from app.api.targets import router as targets_router
+from app.api.templates import router as templates_router
 from app.auth import AuthMiddleware
 from app.db import engine
 from app.domain.errors import DomainError
+from app.logging import configure_logging
+from app.mcp import register_all_tools
+from app.middleware import RequestLoggingMiddleware
+from app.sentry import init_sentry
+
+# Configure structured logging on import (before any logger is used)
+configure_logging(settings_module.settings.log_level)
 
 ERROR_STATUS_BY_CODE: dict[str, int] = {
     "unauthorized": 401,
@@ -41,8 +50,7 @@ def _validate_startup_settings() -> None:
     if blank:
         fields = ", ".join(sorted(blank))
         raise RuntimeError(
-            "Invalid environment configuration: "
-            f"blank required setting(s): {fields}"
+            f"Invalid environment configuration: blank required setting(s): {fields}"
         )
 
 
@@ -51,6 +59,7 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Compose startup/shutdown for both FastAPI and mounted FastMCP apps."""
 
     _validate_startup_settings()
+    init_sentry()
     # Ensure the process-wide engine is initialized during startup.
     _ = engine
     async with mcp_app.lifespan(app):
@@ -75,15 +84,19 @@ async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONRespo
         content=jsonable_encoder(_domain_error_payload(exc)),
     )
 
+
 mcp = FastMCP("nutribrain")
+register_all_tools(mcp)
 mcp_app = mcp.http_app(path="/mcp")
 
 
 def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
     app = FastAPI(title="nutribrain", lifespan=_lifespan)
 
-    # Added last so it sits outermost and handles CORS preflight (OPTIONS, sent
-    # without an Authorization header) before AuthMiddleware ever sees it.
+    # Middleware order (last added = outermost in ASGI):
+    # 1. AuthMiddleware — rejects unauthenticated requests
+    # 2. CORSMiddleware — handles preflight before auth sees OPTIONS
+    # 3. RequestLoggingMiddleware — outermost; binds request_id, logs slow requests
     app.add_middleware(AuthMiddleware, token=settings_module.settings.app_token)
     app.add_middleware(
         CORSMiddleware,
@@ -91,6 +104,7 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     app.add_exception_handler(DomainError, _handle_domain_error)
 
@@ -99,7 +113,9 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(foods_router)
+    app.include_router(meals_router)
     app.include_router(targets_router)
+    app.include_router(templates_router)
 
     if include_mcp_mount:
         # Mounted last: Mount("/", ...) matches every path, so routes defined above it
@@ -107,5 +123,6 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         app.mount("/", mcp_app)
 
     return app
+
 
 app = create_app()

@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-
 # Script now lives in api/scripts/, so its parent directory is api/.
 API_DIR = Path(__file__).resolve().parents[1]
 

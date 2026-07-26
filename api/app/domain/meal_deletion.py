@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.db import Meal, MealItem
 from app.domain.errors import MealItemNotFoundError, MealNotFoundError
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def delete_meal(session: Session, *, meal_id: int) -> dict[str, bool]:
@@ -21,6 +24,7 @@ def delete_meal(session: Session, *, meal_id: int) -> dict[str, bool]:
 
     session.delete(meal)
     session.flush()
+    logger.info("meal_deleted", meal_id=meal_id)
     return {"deleted": True}
 
 
@@ -33,4 +37,5 @@ def delete_meal_item(session: Session, *, item_id: int) -> dict[str, bool]:
 
     session.delete(item)
     session.flush()
+    logger.info("meal_item_deleted", item_id=item_id)
     return {"deleted": True}

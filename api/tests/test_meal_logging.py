@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, date
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy.orm import Session
 
-from app.db import Food, MealItemSource, MealType, QuantityUnit, ServingUnit, Target, MealItem
+from app.db import Food, MealItem, MealItemSource, MealType, QuantityUnit, ServingUnit, Target
 from app.domain import (
-    ItemMacros,
     MealItemSpec,
     log_meal,
 )

@@ -24,7 +24,6 @@ from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-
 # Script lives in api/scripts/, so parent directory is api/.
 API_DIR = Path(__file__).resolve().parents[1]
 
