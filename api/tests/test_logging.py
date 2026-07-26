@@ -28,7 +28,10 @@ class TestRedactAuthorization:
     def test_redacts_nested_headers_dict(self) -> None:
         event: dict[str, object] = {
             "event": "request_received",
-            "headers": {"Authorization": "******", "Content-Type": "application/json"},
+            "headers": {
+                "Authorization": "******",
+                "Content-Type": "application/json",
+            },
         }
         result = _redact_authorization(None, "info", event)
         assert result["headers"]["Authorization"] == "[REDACTED]"  # type: ignore[index]

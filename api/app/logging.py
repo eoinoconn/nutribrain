@@ -41,8 +41,9 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     level = getattr(logging, log_level.upper(), logging.INFO)
 
-    # Determine if we're in dev mode (pretty console) or production (JSON)
-    is_dev = log_level.upper() == "DEBUG" or os.getenv("ENVIRONMENT", "production") == "dev"
+    # Dev mode uses pretty console rendering; production uses JSON.
+    # DEBUG level implies local development; explicit ENVIRONMENT=dev also triggers it.
+    is_dev = log_level.upper() == "DEBUG" or os.getenv("ENVIRONMENT") == "dev"
 
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
