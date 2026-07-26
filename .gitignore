@@ -6,4 +6,3 @@ dist/
 .ruff_cache/
 .pytest_cache/
 *.db
-create-issues.py
