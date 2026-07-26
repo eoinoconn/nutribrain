@@ -135,7 +135,7 @@ class TestGetDay:
         assert result.effective_target is not None
         assert result.effective_target.base_calories == 2000
         assert result.effective_target.calories_out == 500
-        assert result.effective_target.effective_calories == Decimal("2500")
+        assert result.effective_target.effective_calories == 2500
 
         # Delta: 300 - 2500 = -2200
         assert result.delta_vs_target is not None

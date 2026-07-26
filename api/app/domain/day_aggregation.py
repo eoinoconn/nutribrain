@@ -72,7 +72,7 @@ def get_day(session: Session, *, day: date) -> DayResponse:
     delta: ItemMacros | None = None
     if effective_target is not None:
         delta = ItemMacros(
-            calories=day_totals.calories - effective_target.effective_calories,
+            calories=day_totals.calories - Decimal(str(effective_target.effective_calories)),
             protein_g=day_totals.protein_g - Decimal(str(effective_target.protein_g)),
             carbs_g=day_totals.carbs_g - Decimal(str(effective_target.carbs_g)),
             fat_g=day_totals.fat_g - Decimal(str(effective_target.fat_g)),
@@ -221,17 +221,18 @@ def _get_effective_target(session: Session, day: date) -> EffectiveTarget | None
         select(IntervalsCaloriesOut).where(IntervalsCaloriesOut.date == day)
     )
     calories_out = cached_out.calories_out if cached_out is not None else None
-    effective_calories = Decimal(str(target.base_calories))
+    effective_calories = target.base_calories
     if calories_out is not None:
-        effective_calories += Decimal(str(calories_out))
+        effective_calories += calories_out
 
     return EffectiveTarget(
+        effective_from=target.effective_from,
         base_calories=target.base_calories,
-        calories_out=calories_out,
-        effective_calories=effective_calories,
         protein_g=target.protein_g,
         carbs_g=target.carbs_g,
         fat_g=target.fat_g,
+        calories_out=calories_out,
+        effective_calories=effective_calories,
     )
 
 
@@ -282,16 +283,17 @@ def _get_effective_targets_for_range(
 
         if applicable is not None:
             cal_out = calories_out_map.get(current)
-            effective_calories = Decimal(str(applicable.base_calories))
+            effective_calories = applicable.base_calories
             if cal_out is not None:
-                effective_calories += Decimal(str(cal_out))
+                effective_calories += cal_out
             result[current] = EffectiveTarget(
+                effective_from=applicable.effective_from,
                 base_calories=applicable.base_calories,
-                calories_out=cal_out,
-                effective_calories=effective_calories,
                 protein_g=applicable.protein_g,
                 carbs_g=applicable.carbs_g,
                 fat_g=applicable.fat_g,
+                calories_out=cal_out,
+                effective_calories=effective_calories,
             )
 
         current += timedelta(days=1)
@@ -319,7 +321,7 @@ def _build_periods(
             target = targets_map.get(current)
             adherence: bool | None = None
             if target is not None:
-                adherence = totals.calories <= target.effective_calories
+                adherence = totals.calories <= Decimal(str(target.effective_calories))
             periods.append(
                 PeriodTotals(
                     period_start=current,
@@ -361,7 +363,7 @@ def _build_periods(
         adherence = None
         if target is not None:
             avg_daily_calories = week_totals.calories / Decimal(str(num_days))
-            adherence = avg_daily_calories <= target.effective_calories
+            adherence = avg_daily_calories <= Decimal(str(target.effective_calories))
 
         periods.append(
             PeriodTotals(
