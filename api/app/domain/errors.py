@@ -1,4 +1,8 @@
-"""Domain exception hierarchy used by API and MCP adapters."""
+"""Domain exception hierarchy used by API and MCP adapters.
+
+Every Appendix C error code maps to exactly one subclass of :class:`DomainError`.
+Transport adapters translate these into HTTP status codes or MCP tool errors.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +21,19 @@ class DomainError(ValueError):
         self.error = error
         self.message = message
         self.candidates = candidates
+
+
+# --- Authentication --------------------------------------------------------
+
+
+class UnauthorizedError(DomainError):
+    """Request lacks valid credentials."""
+
+    def __init__(self, message: str = "Valid credentials are required.") -> None:
+        super().__init__(error="unauthorized", message=message)
+
+
+# --- Food errors -----------------------------------------------------------
 
 
 class FoodNotFoundError(DomainError):
@@ -61,6 +78,32 @@ class ServingUnitImmutableError(DomainError):
         )
 
 
+# --- Meal errors -----------------------------------------------------------
+
+
+class MealNotFoundError(DomainError):
+    """No meal exists with the given ID."""
+
+    def __init__(self, meal_id: int) -> None:
+        super().__init__(
+            error="meal_not_found",
+            message=f"Meal {meal_id} not found.",
+        )
+
+
+class MealItemNotFoundError(DomainError):
+    """No meal item exists with the given ID."""
+
+    def __init__(self, item_id: int) -> None:
+        super().__init__(
+            error="meal_item_not_found",
+            message=f"Meal item {item_id} not found.",
+        )
+
+
+# --- Template errors -------------------------------------------------------
+
+
 class TemplateNotFoundError(DomainError):
     """Template could not be found by id or name."""
 
@@ -69,3 +112,13 @@ class TemplateNotFoundError(DomainError):
             error="template_not_found",
             message=f"No template found for '{identifier}'.",
         )
+
+
+# --- External integrations -------------------------------------------------
+
+
+class IntervalsUnavailableError(DomainError):
+    """intervals.icu sync failed or is unreachable."""
+
+    def __init__(self, message: str = "intervals.icu sync failed.") -> None:
+        super().__init__(error="intervals_unavailable", message=message)

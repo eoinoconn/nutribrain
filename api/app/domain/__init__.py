@@ -27,8 +27,12 @@ from app.domain.errors import (
     FoodAmbiguousError,
     FoodDuplicateError,
     FoodNotFoundError,
+    IntervalsUnavailableError,
+    MealItemNotFoundError,
+    MealNotFoundError,
     ServingUnitImmutableError,
     TemplateNotFoundError,
+    UnauthorizedError,
 )
 from app.domain.food_resolution import resolve_food
 from app.domain.foods import (
@@ -39,6 +43,7 @@ from app.domain.foods import (
     set_favorite_food,
     update_food,
 )
+from app.domain.meal_deletion import delete_meal, delete_meal_item
 from app.domain.meal_logging import log_meal
 from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
 from app.domain.nutrition_math import (
@@ -66,9 +71,12 @@ __all__ = [
     "FoodCandidate",
     "FoodDuplicateError",
     "FoodNotFoundError",
+    "IntervalsUnavailableError",
     "ItemMacros",
+    "MealItemNotFoundError",
     "MealItemResponse",
     "MealItemSpec",
+    "MealNotFoundError",
     "MealResponse",
     "PeriodTotals",
     "RangeResponse",
@@ -78,12 +86,15 @@ __all__ = [
     "TemplateItemSpec",
     "TemplateNotFoundError",
     "TemplateResponse",
+    "UnauthorizedError",
     "UnitNormalizationError",
     "UpdateFoodResult",
     "add_food",
     "compute_item_macros",
     "create_template",
     "delete_food",
+    "delete_meal",
+    "delete_meal_item",
     "delete_template",
     "get_day",
     "get_effective_target",
