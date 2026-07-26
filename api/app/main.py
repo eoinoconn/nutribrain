@@ -18,6 +18,7 @@ from app.db import engine
 from app.domain.errors import DomainError
 from app.logging import configure_logging
 from app.middleware import RequestLoggingMiddleware
+from app.mcp import register_all_tools
 from app.sentry import init_sentry
 
 # Configure structured logging on import (before any logger is used)
@@ -84,6 +85,7 @@ async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONRespo
 
 
 mcp = FastMCP("nutribrain")
+register_all_tools(mcp)
 mcp_app = mcp.http_app(path="/mcp")
 
 
