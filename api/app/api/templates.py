@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -215,8 +215,11 @@ def _items_to_specs(items: list[TemplateItemRequest]) -> list[TemplateItemSpec]:
 
 
 @router.get("", response_model=list[TemplateOut])
-def list_all_templates(session: DbSession) -> list[TemplateOut]:
-    results = list_templates(session)
+def list_all_templates(
+    session: DbSession,
+    q: Annotated[str, Query(description="Filter templates by name")] = "",
+) -> list[TemplateOut]:
+    results = list_templates(session, query=q)
     return [_template_response_to_out(t) for t in results]
 
 

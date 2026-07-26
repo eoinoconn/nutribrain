@@ -79,6 +79,27 @@ class TestTemplateRoutes:
         names = [t["name"] for t in data]
         assert "Lunch Bowl" in names
 
+    def test_list_templates_with_search(
+        self, db_session: Session, make_template, make_template_item
+    ) -> None:
+        make_template(name="Morning Oats")
+        make_template(name="Lunch Bowl")
+
+        app = create_app(include_mcp_mount=False)
+        app.dependency_overrides[get_session] = _override_session(db_session)
+        try:
+            with TestClient(app) as client:
+                response = client.get(
+                    "/api/templates", headers=_auth_headers(), params={"q": "oats"}
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Morning Oats"
+
     def test_patch_template_name(self, db_session: Session, make_template) -> None:
         t = make_template(name="Old Name")
 
