@@ -13,6 +13,9 @@ from app.domain.dto import (
     MealItemSpec,
     MealResponse,
     SetTargetResult,
+    TemplateItemResponse,
+    TemplateItemSpec,
+    TemplateResponse,
 )
 from app.domain.errors import (
     DomainError,
@@ -20,6 +23,7 @@ from app.domain.errors import (
     FoodDuplicateError,
     FoodNotFoundError,
     ServingUnitImmutableError,
+    TemplateNotFoundError,
 )
 from app.domain.food_resolution import resolve_food
 from app.domain.foods import (
@@ -38,6 +42,13 @@ from app.domain.nutrition_math import (
     normalize_to_grams,
 )
 from app.domain.targets import get_effective_target, set_target
+from app.domain.templates import (
+    create_template,
+    delete_template,
+    list_templates,
+    log_template,
+    update_template,
+)
 
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
@@ -52,21 +63,30 @@ __all__ = [
     "MealItemResponse",
     "MealItemSpec",
     "MealResponse",
-    "SetTargetResult",
     "ServingUnitImmutableError",
+    "SetTargetResult",
+    "TemplateItemResponse",
+    "TemplateItemSpec",
+    "TemplateNotFoundError",
+    "TemplateResponse",
     "UnitNormalizationError",
     "UpdateFoodResult",
     "add_food",
     "compute_item_macros",
-    "get_effective_target",
+    "create_template",
     "delete_food",
+    "delete_template",
+    "get_effective_target",
     "infer_meal_type",
+    "list_templates",
     "log_meal",
+    "log_template",
     "normalize_to_grams",
     "parse_local_date",
     "resolve_food",
     "resolve_meal_type",
-    "set_target",
     "set_favorite_food",
+    "set_target",
     "update_food",
+    "update_template",
 ]

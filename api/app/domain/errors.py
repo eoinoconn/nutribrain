@@ -59,3 +59,13 @@ class ServingUnitImmutableError(DomainError):
             error="serving_unit_immutable",
             message="Cannot change serving_unit. Create a new food instead.",
         )
+
+
+class TemplateNotFoundError(DomainError):
+    """Template could not be found by id or name."""
+
+    def __init__(self, identifier: str | int) -> None:
+        super().__init__(
+            error="template_not_found",
+            message=f"No template found for '{identifier}'.",
+        )
