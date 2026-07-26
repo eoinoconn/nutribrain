@@ -41,7 +41,8 @@ def _validate_startup_settings() -> None:
     if blank:
         fields = ", ".join(sorted(blank))
         raise RuntimeError(
-            f"Invalid environment configuration: blank required setting(s): {fields}"
+            "Invalid environment configuration: "
+            f"blank required setting(s): {fields}"
         )
 
 
@@ -73,7 +74,6 @@ async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONRespo
         status_code=_status_for_domain_error(exc.error),
         content=jsonable_encoder(_domain_error_payload(exc)),
     )
-
 
 mcp = FastMCP("nutribrain")
 mcp_app = mcp.http_app(path="/mcp")
@@ -107,6 +107,5 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
         app.mount("/", mcp_app)
 
     return app
-
 
 app = create_app()
