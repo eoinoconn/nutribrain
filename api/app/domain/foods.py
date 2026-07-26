@@ -21,6 +21,9 @@ from app.domain.errors import (
     FoodNotFoundError,
     ServingUnitImmutableError,
 )
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +89,7 @@ def add_food(
     )
     session.add(food)
     session.flush()
+    logger.info("food_added", food_id=food.id, name=food.name)
     return AddFoodResult(food=food)
 
 
@@ -142,6 +146,7 @@ def update_food(
     session.flush()
 
     affected_meals_count = _count_affected_meals(session, food_id)
+    logger.info("food_updated", food_id=food_id, affected_meals_count=affected_meals_count)
     return UpdateFoodResult(food=food, affected_meals_count=affected_meals_count)
 
 
@@ -178,6 +183,7 @@ def delete_food(
         now = datetime.now(UTC)
     food.deleted_at = now
     session.flush()
+    logger.info("food_deleted", food_id=food_id)
     return food
 
 
