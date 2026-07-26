@@ -768,6 +768,8 @@ services:
     envVars:
       - key: DATABASE_URL          # from Neon
       - key: APP_TOKEN             # generated once
+      - key: CORS_ORIGIN
+        value: https://nutrition-web.onrender.com
       - key: INTERVALS_API_KEY
       - key: INTERVALS_ATHLETE_ID
       - key: TZ
@@ -976,6 +978,7 @@ Establishes backups actually work.
 |---|---|---|
 | `DATABASE_URL` | api, cron | Neon connection string |
 | `APP_TOKEN` | api | Bearer token for auth |
+| `CORS_ORIGIN` | api | Static dashboard site origin, allowlisted for CORS |
 | `INTERVALS_API_KEY` | api, cron | intervals.icu HTTP Basic password |
 | `INTERVALS_ATHLETE_ID` | api, cron | intervals.icu athlete id |
 | `INTERVALS_SYNC_DAYS` | cron | Days of history to sync nightly (default 3) |

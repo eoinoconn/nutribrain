@@ -104,6 +104,37 @@ FastAPI's `dependencies=[Depends(require_auth)]` on a router **does not** apply 
 
 ## Questions and future amendments
 
+### D-003 — G7 resolved: auth enforced via ASGI middleware (2026-07-26)
+
+**Empirical result (T-030):** confirmed G7's prediction. A `require_auth`
+FastAPI dependency applied via `dependencies=[Depends(require_auth)]` on a
+router does not run for requests handled by the FastMCP app mounted at
+`/mcp` — `TestClient(app).post("/mcp", ...)` with no `Authorization` header
+reached the MCP session layer unrejected in a throwaway reproduction.
+
+**Decision:** auth is enforced by `AuthMiddleware` (`api/app/auth.py`), a
+plain ASGI middleware added to the FastAPI app with `add_middleware`. It
+wraps the entire ASGI stack — both FastAPI-owned routes and the mounted
+FastMCP app — checking every request path except `/health` for a valid
+`Authorization: Bearer <token>` header via `hmac.compare_digest`.
+
+**Amendment to §9's "Forward-compatibility" and "Auth upgrade path":** spec
+§9 names `require_auth` as "the seam for future Google OAuth ... zero route
+code touched during upgrade," on the assumption every route declares
+`Depends(require_auth)`. That assumption is false in this design — no route
+does, and one at `/mcp` couldn't anyway. A `require_auth` function was
+written and then removed: nothing called it, so it enforced nothing and
+would have sat on routes as a misleading no-op. The upgrade seam is instead
+`_auth_error` in `api/app/auth.py` — swap its body for session-cookie or JWT
+validation and every route stays covered, because `AuthMiddleware` is what
+every request actually passes through.
+
+**Middleware ordering:** `CORSMiddleware` is added after `AuthMiddleware`
+(Starlette runs middleware in reverse-add order, outermost last-added), so
+browser CORS preflight `OPTIONS` requests — sent without an `Authorization`
+header — are handled by `CORSMiddleware` before they ever reach the auth
+check.
+
 ### D-002 — Fuzzy food-match similarity threshold (2026-07-26)
 
 **Decision:** `resolve_food` uses a trigram similarity threshold of `0.35` via

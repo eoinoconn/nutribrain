@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     database_url: str
     app_token: str
+    cors_origin: str
     intervals_api_key: str
     intervals_athlete_id: str
     tz: str = "Europe/Dublin"

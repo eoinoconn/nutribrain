@@ -57,6 +57,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/nutribrain
       APP_TOKEN: test-token
+      CORS_ORIGIN: http://localhost:5173
       INTERVALS_API_KEY: test-key
       INTERVALS_ATHLETE_ID: test-athlete
     steps:

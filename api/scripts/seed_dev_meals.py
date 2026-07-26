@@ -99,6 +99,17 @@ PRESETS: dict[str, list[SeedMeal]] = {
                     fiber_g="4",
                     sodium_mg="540",
                 ),
+                SeedMealItem(
+                    name="Olive Oil Drizzle",
+                    quantity="1",
+                    quantity_unit="tbsp",
+                    calories="119",
+                    protein_g="0",
+                    carbs_g="0",
+                    fat_g="13.5",
+                    sat_fat_g="1.9",
+                    sodium_mg="0",
+                ),
             ],
         ),
         SeedMeal(
