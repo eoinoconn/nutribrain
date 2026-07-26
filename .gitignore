@@ -1,0 +1,9 @@
+.env
+__pycache__/
+.venv/
+node_modules/
+dist/
+.ruff_cache/
+.pytest_cache/
+*.db
+create-issues.py
