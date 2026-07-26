@@ -31,6 +31,27 @@ export default tseslint.config(
       "react-refresh": reactRefresh
     },
     rules: {
+      "@typescript-eslint/naming-convention": [
+        "error",
+        {
+          selector: "variable",
+          format: ["camelCase", "UPPER_CASE"],
+          leadingUnderscore: "allow"
+        },
+        {
+          selector: "function",
+          format: ["camelCase", "PascalCase"]
+        },
+        {
+          selector: "parameter",
+          format: ["camelCase"],
+          leadingUnderscore: "allow"
+        },
+        {
+          selector: "typeLike",
+          format: ["PascalCase"]
+        }
+      ],
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true }
