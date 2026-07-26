@@ -73,14 +73,28 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install system libpq
+        # Runtime dependency of the pure `psycopg` build (decision D-001).
+        run: sudo apt-get update && sudo apt-get install -y libpq5
+
       - name: Sync dependencies
         run: uv sync --all-groups --locked
 
       - name: Ruff check
         run: uv run ruff check .
 
+      - name: Ruff format
+        run: uv run ruff format --check .
+
       - name: MyPy
         run: uv run mypy app
+
+      - name: Verify migrations apply and match models
+        # Applies the full migration chain to the Postgres service, then asserts
+        # the models and migrations have not drifted (autogenerate empty diff).
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
 
       - name: Pytest
         run: uv run pytest
