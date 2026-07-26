@@ -1,4 +1,8 @@
-"""Domain exception hierarchy used by API and MCP adapters."""
+"""Domain exception hierarchy used by API and MCP adapters.
+
+Every Appendix C error code maps to exactly one subclass of :class:`DomainError`.
+Transport adapters translate these into HTTP status codes or MCP tool errors.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +21,19 @@ class DomainError(ValueError):
         self.error = error
         self.message = message
         self.candidates = candidates
+
+
+# --- Authentication --------------------------------------------------------
+
+
+class UnauthorizedError(DomainError):
+    """Request lacks valid credentials."""
+
+    def __init__(self, message: str = "Valid credentials are required.") -> None:
+        super().__init__(error="unauthorized", message=message)
+
+
+# --- Food errors -----------------------------------------------------------
 
 
 class FoodNotFoundError(DomainError):
@@ -38,3 +55,69 @@ class FoodAmbiguousError(DomainError):
             message=f"Multiple foods match '{name}'. Specify one.",
             candidates=candidates,
         )
+
+
+class FoodDuplicateError(DomainError):
+    """add_food name collision without force: true."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(
+            error="food_duplicate",
+            message=f"A food named '{name}' already exists. Pass force=true to create anyway.",
+        )
+
+
+class ServingUnitImmutableError(DomainError):
+    """update_food attempt to change serving unit."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            error="serving_unit_immutable",
+            message="Cannot change serving_unit. Create a new food instead.",
+        )
+
+
+# --- Meal errors -----------------------------------------------------------
+
+
+class MealNotFoundError(DomainError):
+    """No meal exists with the given ID."""
+
+    def __init__(self, meal_id: int) -> None:
+        super().__init__(
+            error="meal_not_found",
+            message=f"Meal {meal_id} not found.",
+        )
+
+
+class MealItemNotFoundError(DomainError):
+    """No meal item exists with the given ID."""
+
+    def __init__(self, item_id: int) -> None:
+        super().__init__(
+            error="meal_item_not_found",
+            message=f"Meal item {item_id} not found.",
+        )
+
+
+# --- Template errors -------------------------------------------------------
+
+
+class TemplateNotFoundError(DomainError):
+    """No active template exists with the given ID."""
+
+    def __init__(self, template_id: int) -> None:
+        super().__init__(
+            error="template_not_found",
+            message=f"Template {template_id} not found.",
+        )
+
+
+# --- External integrations -------------------------------------------------
+
+
+class IntervalsUnavailableError(DomainError):
+    """intervals.icu sync failed or is unreachable."""
+
+    def __init__(self, message: str = "intervals.icu sync failed.") -> None:
+        super().__init__(error="intervals_unavailable", message=message)
