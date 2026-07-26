@@ -93,7 +93,11 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ~256 bits of entropy. Store in `.env` locally and in Render's environment variables on deployment.
 
-**MCP client setup (Claude Desktop):**
+**MCP client setup:** See [docs/mcp-client-setup.md](docs/mcp-client-setup.md)
+for full configuration instructions covering Claude Desktop (`mcp-remote`),
+Claude web/mobile (custom connector), and token rotation.
+
+**Claude Desktop quick config** (`claude_desktop_config.json`):
 
 ```json
 {
@@ -249,6 +253,7 @@ See [CLAUDE.md](CLAUDE.md) for agent-specific guidance, [docs/style.md](docs/sty
 - [docs/backlog.md](docs/backlog.md) — Build backlog with task descriptions
 - [docs/style.md](docs/style.md) — Code style guide
 - [docs/decisions.md](docs/decisions.md) — Specification amendments and resolutions
+- [docs/mcp-client-setup.md](docs/mcp-client-setup.md) — MCP client configuration guide
 - [api/CLAUDE.md](api/CLAUDE.md) — API module guide
 - [web/CLAUDE.md](web/CLAUDE.md) — Web module guide
 
