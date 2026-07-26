@@ -104,4 +104,15 @@ FastAPI's `dependencies=[Depends(require_auth)]` on a router **does not** apply 
 
 ## Questions and future amendments
 
-- None yet. Record future decisions here with date and context.
+### D-001 — Production image must provide `libpq` (2026-07-26)
+
+**Context:** The runtime dependency is plain `psycopg` (pure-Python implementation), pinned in `api/uv.lock`. That implementation links against the system `libpq` shared library at runtime; it does **not** bundle one.
+
+**Decision:**
+- The production image **must** provide `libpq` (e.g. `apt-get install -y libpq5` on a Debian/`slim` base). Render's native Python runtime already includes it; a custom Docker base does not.
+- Alternative if a system `libpq` is undesirable: switch the production dependency to `psycopg[c]` (compiled against system libpq, needs `libpq-dev` at build time) or `psycopg[binary]` (bundles libpq — discouraged by the psycopg maintainers for production because the bundled OpenSSL can't be patched independently).
+- **Local dev / CI:** install system `libpq5` to mirror the production code path. Do not add `psycopg[binary]` to the manifest, to avoid dev/prod divergence.
+
+**Action when deploy config lands:** Fold this requirement into `render.yaml` / the Dockerfile as part of the deployment task so the connection layer isn't broken at first boot.
+
+**Rationale:** `render.yaml` is still a placeholder, so nothing currently guarantees `libpq` in production. Recording this now prevents a silent first-boot failure (`ImportError`/`libpq` not found) when the image is finally defined.

@@ -17,10 +17,12 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
     func,
+    text,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -99,6 +101,12 @@ def _pg_enum(enum_cls: type[enum.Enum], name: str) -> SAEnum:
 # --- Models ----------------------------------------------------------------
 class Food(Base):
     __tablename__ = "foods"
+    __table_args__ = (
+        # Fuzzy resolution reads through lower(name) (§3 indices, T-021).
+        Index("ix_foods_lower_name", text("lower(name)")),
+        # Cheap favorite lookup: partial index over the favorites only (§3).
+        Index("ix_foods_is_favorite", "is_favorite", postgresql_where=text("is_favorite")),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -230,6 +238,10 @@ class TemplateItem(Base):
 
 class Target(Base):
     __tablename__ = "targets"
+    # get_effective_target scans for the latest effective_from <= day (§3, T-025),
+    # so the index is DESC. Alembic compares index ordering, so the model must
+    # declare DESC to match the migration and keep autogenerate empty.
+    __table_args__ = (Index("ix_targets_effective_from", text("effective_from DESC")),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     effective_from: Mapped[date] = mapped_column(Date)
