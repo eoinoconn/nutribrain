@@ -5,13 +5,18 @@ implemented in one place.
 """
 
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
+from app.domain.day_aggregation import get_day, get_range
 from app.domain.dto import (
+    DayMealGroup,
+    DayResponse,
     EffectiveTarget,
     FoodCandidate,
     ItemMacros,
     MealItemResponse,
     MealItemSpec,
     MealResponse,
+    PeriodTotals,
+    RangeResponse,
     SetTargetResult,
     TemplateItemResponse,
     TemplateItemSpec,
@@ -53,6 +58,8 @@ from app.domain.templates import (
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
     "AddFoodResult",
+    "DayMealGroup",
+    "DayResponse",
     "DomainError",
     "EffectiveTarget",
     "FoodAmbiguousError",
@@ -63,6 +70,8 @@ __all__ = [
     "MealItemResponse",
     "MealItemSpec",
     "MealResponse",
+    "PeriodTotals",
+    "RangeResponse",
     "ServingUnitImmutableError",
     "SetTargetResult",
     "TemplateItemResponse",
@@ -76,7 +85,9 @@ __all__ = [
     "create_template",
     "delete_food",
     "delete_template",
+    "get_day",
     "get_effective_target",
+    "get_range",
     "infer_meal_type",
     "list_templates",
     "log_meal",
