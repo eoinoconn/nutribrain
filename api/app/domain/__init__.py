@@ -6,11 +6,13 @@ implemented in one place.
 
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
 from app.domain.dto import (
+    EffectiveTarget,
     FoodCandidate,
     ItemMacros,
     MealItemResponse,
     MealItemSpec,
     MealResponse,
+    SetTargetResult,
 )
 from app.domain.errors import (
     DomainError,
@@ -25,10 +27,12 @@ from app.domain.nutrition_math import (
     compute_item_macros,
     normalize_to_grams,
 )
+from app.domain.targets import get_effective_target, set_target
 
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
     "DomainError",
+    "EffectiveTarget",
     "FoodAmbiguousError",
     "FoodCandidate",
     "FoodNotFoundError",
@@ -36,12 +40,15 @@ __all__ = [
     "MealItemResponse",
     "MealItemSpec",
     "MealResponse",
+    "SetTargetResult",
     "UnitNormalizationError",
     "compute_item_macros",
+    "get_effective_target",
     "infer_meal_type",
     "log_meal",
     "normalize_to_grams",
     "parse_local_date",
     "resolve_food",
     "resolve_meal_type",
+    "set_target",
 ]
