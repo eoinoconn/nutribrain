@@ -206,3 +206,18 @@ class RangeResponse:
     to_date: date
     granularity: str  # "day" or "week"
     periods: list[PeriodTotals]
+
+
+@dataclass(frozen=True, slots=True)
+class SyncIntervalsResult:
+    """Result of one sync_intervals invocation (§8, T-061).
+
+    ``days_synced`` counts days actually written (a cached ``0`` counts; a
+    ``null`` day that was skipped does not). ``failures`` holds one entry per
+    day whose write failed, so the rest of the range can still succeed.
+    """
+
+    from_date: date
+    to_date: date
+    days_synced: int
+    failures: list[dict[str, object]]

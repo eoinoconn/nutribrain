@@ -18,6 +18,7 @@ from app.domain.dto import (
     PeriodTotals,
     RangeResponse,
     SetTargetResult,
+    SyncIntervalsResult,
     TargetRow,
     TemplateItemResponse,
     TemplateItemSpec,
@@ -46,6 +47,7 @@ from app.domain.foods import (
     set_favorite_food,
     update_food,
 )
+from app.domain.intervals_sync import sync_intervals
 from app.domain.meal_deletion import delete_meal, delete_meal_item
 from app.domain.meal_logging import log_meal
 from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
@@ -86,6 +88,7 @@ __all__ = [
     "RangeResponse",
     "ServingUnitImmutableError",
     "SetTargetResult",
+    "SyncIntervalsResult",
     "TargetRow",
     "TemplateItemResponse",
     "TemplateItemSpec",
@@ -116,6 +119,7 @@ __all__ = [
     "search_foods",
     "set_favorite_food",
     "set_target",
+    "sync_intervals",
     "update_food",
     "update_template",
 ]
