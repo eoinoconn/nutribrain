@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastmcp import FastMCP
 
 from app import settings as settings_module
@@ -79,10 +80,11 @@ def _domain_error_payload(exc: DomainError) -> dict[str, object]:
     return payload
 
 
-async def _handle_domain_error(_request: Request, exc: DomainError) -> JSONResponse:
+async def _handle_domain_error(_request: Request, exc: Exception) -> Response:
+    domain_exc = cast(DomainError, exc)
     return JSONResponse(
-        status_code=_status_for_domain_error(exc.error),
-        content=jsonable_encoder(_domain_error_payload(exc)),
+        status_code=_status_for_domain_error(domain_exc.error),
+        content=jsonable_encoder(_domain_error_payload(domain_exc)),
     )
 
 

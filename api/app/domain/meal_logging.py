@@ -160,6 +160,8 @@ def log_meal(
     for _spec, meal_item in resolved_items:
         # Reload the item to get the computed macros
         refreshed_item = session.get(MealItem, meal_item.id)
+        if refreshed_item is None:
+            raise ValueError(f"MealItem {meal_item.id} not found after flush")
 
         # For food-backed items, load the food; for ad-hoc items, pass None
         food = None
@@ -211,6 +213,8 @@ def _compute_meal_totals(
     for _spec, meal_item in resolved_items:
         # Reload item to ensure it has the ID
         refreshed_item = session.get(MealItem, meal_item.id)
+        if refreshed_item is None:
+            raise ValueError(f"MealItem {meal_item.id} not found after flush")
 
         # For food-backed items, load the food; for ad-hoc items, pass None
         food = None
