@@ -104,6 +104,24 @@ FastAPI's `dependencies=[Depends(require_auth)]` on a router **does not** apply 
 
 ## Questions and future amendments
 
+### D-004 — Frontend token localStorage key: spec wins over backlog task text (2026-07-27)
+
+**Conflict:** backlog task T-070's own text specified the token localStorage
+key as `nutrition:token`. Spec §9 ("Dashboard UX") specifies `nutribrain:token`.
+This backlog's own working agreement states that where the backlog and spec
+disagree, the spec wins.
+
+**Decision:** use `nutribrain:token` (per spec §9), implemented in
+`web/src/lib/tokenStore.ts` as `TOKEN_STORAGE_KEY`. The backlog task text's
+`nutrition:token` was treated as a transcription slip, not an intentional
+override.
+
+**Related correction:** `web/CLAUDE.md`'s "Auth Token Handling" section
+previously described a build-time `VITE_APP_TOKEN` env var, which does not
+match spec §9's runtime paste-token-into-`localStorage` flow (what T-070
+actually implements). Corrected in the same change so future agents aren't
+misled by it.
+
 ### D-003 — G7 resolved: auth enforced via ASGI middleware (2026-07-26)
 
 **Empirical result (T-030):** confirmed G7's prediction. A `require_auth`

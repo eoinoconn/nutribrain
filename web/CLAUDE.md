@@ -23,10 +23,10 @@ Use this pattern for mutations that update visible daily data:
 6. On settle, `invalidateQueries` for authoritative re-fetch.
 
 ## Auth Token Handling
-- Token source is `APP_TOKEN`.
-- Token should be provided via environment-backed config (for example `VITE_APP_TOKEN` in local setup) and never hardcoded.
-- Fetch client/interceptor attaches `Authorization: Bearer <token>` to API requests.
-- Never log the token.
+- Token is pasted by the user at runtime into a landing screen (spec §9) and stored in `localStorage` under `nutribrain:token` (see `src/lib/tokenStore.ts`) — not a build-time env var.
+- Fetch client/interceptor (`src/lib/apiClient.ts`) attaches `Authorization: Bearer <token>` to API requests.
+- A 401 response clears the stored token and returns the user to the paste screen with an invalid-token message.
+- Never log the token, even masked forms in debug output.
 
 ## Accessibility Floor
 - Keep `eslint-plugin-jsx-a11y` enabled and clean.
