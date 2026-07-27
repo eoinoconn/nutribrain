@@ -50,7 +50,7 @@ unauthenticated.
 
 ## Phase 0 — Repository, conventions, and agent instructions
 
-### T-001 · Initialize the monorepo
+### T-001 · Initialize the monorepo ✅
 **Depends:** — **Spec:** §2
 
 - `git init`, `main` as default branch, MIT or unlicensed as preferred.
@@ -62,7 +62,7 @@ unauthenticated.
 
 ---
 
-### T-002 · Python toolchain and API scaffold
+### T-002 · Python toolchain and API scaffold ✅
 **Depends:** T-001 **Parallel with:** T-003 **Spec:** §2, stack table
 
 - `api/pyproject.toml` managed by `uv`, Python 3.12+, with runtime deps (fastapi, fastmcp, uvicorn, sqlalchemy, alembic, psycopg, httpx, structlog, pydantic-settings) and dev deps (pytest, pytest-asyncio, ruff, mypy, coverage).
@@ -75,7 +75,7 @@ unauthenticated.
 
 ---
 
-### T-003 · Frontend toolchain and web scaffold
+### T-003 · Frontend toolchain and web scaffold ✅
 **Depends:** T-001 **Parallel with:** T-002 **Spec:** §7
 
 - Vite + React + TypeScript in `web/`, strict `tsconfig` (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`).
@@ -88,7 +88,7 @@ unauthenticated.
 
 ---
 
-### T-004 · Coding style guide
+### T-004 · Coding style guide ✅
 **Depends:** T-002, T-003 **Spec:** §2, §3, §11
 
 Write `docs/style.md`. This is the document agents are pointed at, so it must be prescriptive rather than aspirational.
@@ -109,7 +109,7 @@ Cover:
 
 ---
 
-### T-005 · Author CLAUDE.md
+### T-005 · Author CLAUDE.md ✅
 **Depends:** T-004 **Spec:** all
 
 Write a root `CLAUDE.md`, plus focused `api/CLAUDE.md` and `web/CLAUDE.md`. Root file stays under ~200 lines; if it grows past that, push detail into `docs/` and link.
@@ -133,7 +133,7 @@ Root `CLAUDE.md` must contain:
 
 ---
 
-### T-006 · CI pipeline
+### T-006 · CI pipeline ✅
 **Depends:** T-002, T-003 **Spec:** §10
 
 - GitHub Actions with two jobs, path-filtered so `web/` changes don't run Python.
@@ -145,7 +145,7 @@ Root `CLAUDE.md` must contain:
 
 ---
 
-### T-007 · Environment, secrets, and README
+### T-007 · Environment, secrets, and README ✅
 **Depends:** T-002, T-003 **Spec:** §10, Appendix A
 
 - `.env.example` with every Appendix A variable, placeholder values, and a one-line comment each.
@@ -159,7 +159,7 @@ Root `CLAUDE.md` must contain:
 
 ## Phase 1 — Data layer
 
-### T-010 · SQLAlchemy models and enums
+### T-010 · SQLAlchemy models and enums ✅
 **Depends:** T-002 **Spec:** §3, Appendix B
 
 - All seven tables from §3 with exact column names, types, and nullability.
@@ -173,7 +173,7 @@ Root `CLAUDE.md` must contain:
 
 ---
 
-### T-011 · Alembic setup and initial migration
+### T-011 · Alembic setup and initial migration ✅
 **Depends:** T-010 **Spec:** §3, §10
 
 - Alembic configured to read `DATABASE_URL` from settings, with `compare_type` and `compare_server_default` on.
@@ -184,7 +184,7 @@ Root `CLAUDE.md` must contain:
 
 ---
 
-### T-012 · Test database harness
+### T-012 · Test database harness ✅
 **Depends:** T-011 **Spec:** §2
 
 - Pytest fixtures: session-scoped migrated database, function-scoped transaction rolled back after each test.
@@ -195,7 +195,7 @@ Root `CLAUDE.md` must contain:
 
 ---
 
-### T-013 · Neon provisioning and branch workflow
+### T-013 · Neon provisioning and branch workflow ✅
 **Depends:** T-011 **Spec:** §10
 
 - Create the Neon project and record the pooled and direct connection strings.
@@ -210,7 +210,7 @@ Root `CLAUDE.md` must contain:
 
 This phase is the product. Everything after it is adapters.
 
-### T-020 · Unit normalization and read-time macro calculation
+### T-020 · Unit normalization and read-time macro calculation ✅
 **Depends:** T-012 **Spec:** §3 (read-time macro calculation)
 
 - `normalize_to_grams(quantity, unit, food)` handling the full G4 unit set. Mass units use fixed factors; volume units convert to ml, then to grams via `food.density_g_per_ml` (null → 1.0).
@@ -223,7 +223,7 @@ This phase is the product. Everything after it is adapters.
 
 ---
 
-### T-021 · Food resolution rules
+### T-021 · Food resolution rules ✅
 **Depends:** T-020 **Spec:** §4 (`log_meal` resolution), §6
 
 Implement the resolution ladder precisely and in order:
@@ -242,7 +242,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-022 · Meal-type inference and date parsing
+### T-022 · Meal-type inference and date parsing ✅
 **Depends:** T-012 **Spec:** §4
 
 - Time-window inference: breakfast 04:00–10:59, lunch 11:00–15:59, dinner 16:00–21:59, snack 22:00–03:59, computed in the meal's local timezone.
@@ -253,7 +253,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-023 · `log_meal` domain function
+### T-023 · `log_meal` domain function ✅
 **Depends:** T-021, T-022 **Spec:** §4, §5
 
 - Resolves each item, derives `local_date` from `logged_at` + `local_tz`, writes meal and items in one transaction, sets `source` correctly per item.
@@ -264,7 +264,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-024 · Foods domain operations
+### T-024 · Foods domain operations ✅
 **Depends:** T-021 **Spec:** §3 (mutation rules), §4
 
 - `add_food` with fuzzy-duplicate detection raising `food_duplicate` unless `force`.
@@ -276,7 +276,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-025 · Targets domain
+### T-025 · Targets domain ✅
 **Depends:** T-012 **Spec:** §3, §4
 
 - `set_target` always inserts a new versioned row, never mutates.
@@ -288,7 +288,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-026 · Templates domain
+### T-026 · Templates domain ✅
 **Depends:** T-023 **Spec:** §6
 
 - `create_template`, `update_template`, soft `delete_template`, `list_templates` returning items in full.
@@ -299,7 +299,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-027 · Day and range aggregation
+### T-027 · Day and range aggregation ✅
 **Depends:** T-023, T-025 **Spec:** §4
 
 - `get_day(date)`: meals grouped by meal_type, per-meal and day totals, effective target with breakdown, delta.
@@ -311,7 +311,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-028 · Deletion and error taxonomy
+### T-028 · Deletion and error taxonomy ✅
 **Depends:** T-023 **Spec:** §3, Appendix C
 
 - `delete_meal` and `delete_meal_item` as hard deletes returning `{deleted: true}`.
@@ -324,7 +324,7 @@ Implement the resolution ladder precisely and in order:
 
 ## Phase 3 — Service composition
 
-### T-030 · Auth, health, and CORS
+### T-030 · Auth, health, and CORS ✅
 **Depends:** T-002 **Spec:** §9
 
 - `require_auth` exactly as §9 specifies, using `hmac.compare_digest`.
@@ -336,7 +336,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-031 · Application composition
+### T-031 · Application composition ✅
 **Depends:** T-030 **Spec:** §2, §9
 
 - `app/main.py` composing FastAPI and FastMCP in one process with a shared database session lifecycle.
@@ -347,7 +347,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-032 · Structured logging
+### T-032 · Structured logging ✅
 **Depends:** T-031 **Spec:** §11
 
 - structlog: JSON in production, pretty console in dev, level from `LOG_LEVEL`.
@@ -359,7 +359,7 @@ Implement the resolution ladder precisely and in order:
 
 ---
 
-### T-033 · Sentry (optional)
+### T-033 · Sentry (optional) ✅
 **Depends:** T-031 **Spec:** §11
 
 - Python SDK behind `SENTRY_DSN`, no-op when unset.
@@ -373,27 +373,27 @@ Implement the resolution ladder precisely and in order:
 
 Each task: routes, Pydantic request/response schemas, one happy-path and one error-path test. No business logic — call the domain layer.
 
-### T-040 · Foods routes
+### T-040 · Foods routes ✅
 **Depends:** T-024, T-031 **Spec:** §4, §7
 `GET /api/foods?q=` (fuzzy search, returns favorites marker, `last_logged_at`, `logged_count` per G3), `POST /api/foods`, `PATCH /api/foods/{id}` (returns recompute count), `POST /api/foods/{id}/favorite`, `DELETE /api/foods/{id}` (soft).
 
-### T-041 · Meals routes
+### T-041 · Meals routes ✅
 **Depends:** T-023, T-028 **Spec:** §4, §7
 `POST /api/meals`, `DELETE /api/meals/{id}`, `DELETE /api/meal-items/{id}`. Day detail is the primary correction surface, so error messages here are user-facing — make them readable.
 
-### T-042 · Templates routes
+### T-042 · Templates routes ✅
 **Depends:** T-026 **Spec:** §6, §7
 Full CRUD plus `POST /api/templates/{id}/log` accepting `quantity_scale`.
 
-### T-043 · Targets routes
+### T-043 · Targets routes ✅
 **Depends:** T-025 **Spec:** §4, §7
 `GET /api/targets` (versioned history, `effective_from` desc), `POST /api/targets`, `GET /api/targets/effective?date=`.
 
-### T-044 · Day and range read routes
+### T-044 · Day and range read routes ✅
 **Depends:** T-027 **Spec:** §4, §7
 `GET /api/day/{date}`, `GET /api/range?from=&to=&granularity=`. These back the Today, Day detail, Trends, and Calendar views — shape the payloads so the calendar heatmap needs exactly one call for twelve months.
 
-### T-045 · Sync routes
+### T-045 · Sync routes ✅
 **Depends:** T-061 **Spec:** §8
 `POST /api/sync/intervals`, `GET /api/sync/status` (last sync timestamp, last error), and the manual calories-out override writing `source: manual` per G5.
 
@@ -401,7 +401,7 @@ Full CRUD plus `POST /api/templates/{id}/log` accepting `quantity_scale`.
 
 ## Phase 5 — MCP surface
 
-### T-050 · FastMCP scaffolding and serializers
+### T-050 · FastMCP scaffolding and serializers ✅
 **Depends:** T-031 **Spec:** §4
 
 - Tool registration structure under `app/mcp/`, one module per tool group.
@@ -413,7 +413,7 @@ Full CRUD plus `POST /api/templates/{id}/log` accepting `quantity_scale`.
 
 ---
 
-### T-051 · Write tools
+### T-051 · Write tools ✅
 **Depends:** T-050, T-023, T-024, T-026 **Spec:** §4, §5
 `log_meal`, `log_template`, `add_food`, `update_food`, `create_template`, `update_template`, `delete_template`, `set_target`, `set_favorite_food`, `delete_meal`, `delete_meal_item`.
 
@@ -421,15 +421,15 @@ Full CRUD plus `POST /api/templates/{id}/log` accepting `quantity_scale`.
 
 Tool descriptions must likewise encode the §5 "what Claude should not do" rules — that `update_food` rewrites history and is never the fix for one meal, that templates are user-initiated only, that ambiguity gets escalated rather than guessed. The description is the enforcement mechanism for a model-facing API.
 
-### T-052 · Read tools
+### T-052 · Read tools ✅
 **Depends:** T-050, T-027 **Spec:** §4
 `get_day`, `get_range`, `find_food`, `list_templates`, `get_target`. `find_food` returns everything the resolution rules in §5 need so Claude can decide without a second round trip.
 
-### T-053 · Sync tool
+### T-053 · Sync tool ✅
 **Depends:** T-050, T-061 **Spec:** §4, §8
 `sync_intervals(from?, to?)`, defaulting to the last 7 days, returning days synced and a failure list.
 
-### T-054 · MCP client configuration docs
+### T-054 · MCP client configuration docs ✅
 **Depends:** T-051, T-052, T-053 **Spec:** §9
 Document the `mcp-remote` config from §9 and the Claude web/mobile custom connector setup, including token rotation steps.
 
@@ -437,7 +437,7 @@ Document the `mcp-remote` config from §9 and the Claude web/mobile custom conne
 
 ## Phase 6 — intervals.icu integration
 
-### T-060 · intervals API client
+### T-060 · intervals API client ✅
 **Depends:** T-002 **Spec:** §8
 
 - httpx client hitting the wellness endpoint with HTTP Basic (`API_KEY` as username).
@@ -445,7 +445,7 @@ Document the `mcp-remote` config from §9 and the Claude web/mobile custom conne
 - Timeouts and bounded retries; raises `intervals_unavailable` on failure.
 - Tests use recorded fixtures, never the live API.
 
-### T-061 · Sync worker
+### T-061 · Sync worker ✅
 **Depends:** T-060, T-012 **Spec:** §8
 
 - One shared sync function behind all three triggers.
@@ -455,7 +455,7 @@ Document the `mcp-remote` config from §9 and the Claude web/mobile custom conne
 
 **Done when:** tests cover null, zero, partial failure, and a manual override being replaced by a later sync.
 
-### T-062 · Cron entrypoint
+### T-062 · Cron entrypoint ✅
 **Depends:** T-061 **Spec:** §8, §10
 `python -m app.intervals.sync_recent` reading `INTERVALS_SYNC_DAYS` (default 3), logging days affected and duration, exiting non-zero on total failure so Render surfaces it.
 
