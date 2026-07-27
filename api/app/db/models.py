@@ -264,3 +264,21 @@ class IntervalsCaloriesOut(Base):
         default=IntervalsSource.sync,
         server_default=IntervalsSource.sync.value,
     )
+
+
+class IntervalsSyncStatus(Base):
+    """Singleton row (id=1) tracking the last sync_intervals outcome (§8, T-045).
+
+    The cron trigger runs as a separate Render process from the web dyno, so
+    this must be persisted rather than held in memory for
+    ``GET /api/sync/status`` to see cron-driven syncs.
+    """
+
+    __tablename__ = "intervals_sync_status"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

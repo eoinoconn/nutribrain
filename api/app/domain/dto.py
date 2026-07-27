@@ -221,3 +221,25 @@ class SyncIntervalsResult:
     to_date: date
     days_synced: int
     failures: list[dict[str, object]]
+
+
+@dataclass(frozen=True, slots=True)
+class SyncStatus:
+    """Last known sync_intervals outcome, for the dashboard's status banner (§8).
+
+    ``last_synced_at`` is None if a sync has never run. ``last_error`` reflects
+    only a total sync failure (e.g. auth/network) — per-day failures within an
+    otherwise-successful sync are surfaced via that call's own result instead.
+    """
+
+    last_synced_at: datetime | None
+    last_error: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ManualCaloriesOutResult:
+    """Result of a manual calories-out override (§8 "Manual override", G5)."""
+
+    date: date
+    calories_out: int
+    fetched_at: datetime

@@ -14,6 +14,7 @@ from app import settings as settings_module
 from app.api.day import router as day_router
 from app.api.foods import router as foods_router
 from app.api.meals import router as meals_router
+from app.api.sync import router as sync_router
 from app.api.targets import router as targets_router
 from app.api.templates import router as templates_router
 from app.auth import AuthMiddleware
@@ -118,6 +119,7 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
     app.include_router(foods_router)
     app.include_router(day_router)
     app.include_router(meals_router)
+    app.include_router(sync_router)
     app.include_router(targets_router)
     app.include_router(templates_router)
 

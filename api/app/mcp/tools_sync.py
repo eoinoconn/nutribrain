@@ -1,21 +1,21 @@
-"""MCP sync tools.
-
-T-050 scaffolds discovery, schema, and date parsing. The actual sync behavior
-lands in T-061/T-062.
-"""
+"""MCP sync tool (T-053, §4, §8)."""
 
 from __future__ import annotations
 
 from datetime import date
+from typing import cast
 
 from fastmcp import FastMCP
 
-from app.domain.errors import IntervalsUnavailableError
+from app.domain import sync_intervals
+from app.domain.dto import SyncIntervalsResult as SyncIntervalsDomainResult
+from app.domain.errors import DomainError
+from app.mcp._tool_common import capture_domain_error, run_with_session
 from app.mcp.date_args import default_sync_window, resolve_date_range_args
 from app.mcp.serializers import (
     SyncIntervalsResultModel,
     ToolErrorResponse,
-    serialize_domain_error,
+    serialize_sync_result,
 )
 
 type SyncIntervalsResult = SyncIntervalsResultModel | ToolErrorResponse
@@ -43,8 +43,11 @@ def register_sync_tools(mcp: FastMCP) -> None:
                 local_tz=local_tz,
             )
 
-        # The concrete integration is implemented in T-061.
-        error = IntervalsUnavailableError("Intervals sync is not implemented yet in this scaffold.")
-        tool_error = serialize_domain_error(error)
-        _ = (resolved_from, resolved_to)
-        return tool_error
+        try:
+            result = cast(
+                SyncIntervalsDomainResult,
+                run_with_session(sync_intervals, from_date=resolved_from, to_date=resolved_to),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_sync_result(result)

@@ -12,6 +12,7 @@ from app.domain.dto import (
     EffectiveTarget,
     FoodCandidate,
     ItemMacros,
+    ManualCaloriesOutResult,
     MealItemResponse,
     MealItemSpec,
     MealResponse,
@@ -19,6 +20,7 @@ from app.domain.dto import (
     RangeResponse,
     SetTargetResult,
     SyncIntervalsResult,
+    SyncStatus,
     TargetRow,
     TemplateItemResponse,
     TemplateItemSpec,
@@ -47,7 +49,7 @@ from app.domain.foods import (
     set_favorite_food,
     update_food,
 )
-from app.domain.intervals_sync import sync_intervals
+from app.domain.intervals_sync import get_sync_status, set_manual_calories_out, sync_intervals
 from app.domain.meal_deletion import delete_meal, delete_meal_item
 from app.domain.meal_logging import log_meal
 from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
@@ -79,6 +81,7 @@ __all__ = [
     "FoodSearchResult",
     "IntervalsUnavailableError",
     "ItemMacros",
+    "ManualCaloriesOutResult",
     "MealItemNotFoundError",
     "MealItemResponse",
     "MealItemSpec",
@@ -89,6 +92,7 @@ __all__ = [
     "ServingUnitImmutableError",
     "SetTargetResult",
     "SyncIntervalsResult",
+    "SyncStatus",
     "TargetRow",
     "TemplateItemResponse",
     "TemplateItemSpec",
@@ -107,6 +111,7 @@ __all__ = [
     "get_day",
     "get_effective_target",
     "get_range",
+    "get_sync_status",
     "infer_meal_type",
     "list_targets",
     "list_templates",
@@ -118,6 +123,7 @@ __all__ = [
     "resolve_meal_type",
     "search_foods",
     "set_favorite_food",
+    "set_manual_calories_out",
     "set_target",
     "sync_intervals",
     "update_food",

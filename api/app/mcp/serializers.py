@@ -24,6 +24,7 @@ from app.domain.dto import (
     PeriodTotals,
     RangeResponse,
     SetTargetResult,
+    SyncIntervalsResult,
     TemplateItemResponse,
     TemplateResponse,
 )
@@ -315,6 +316,15 @@ def serialize_range(value: RangeResponse) -> RangeModel:
         to_date=value.to_date,
         granularity=value.granularity,  # type: ignore[arg-type]
         periods=[serialize_period_totals(period) for period in value.periods],
+    )
+
+
+def serialize_sync_result(value: SyncIntervalsResult) -> SyncIntervalsResultModel:
+    return SyncIntervalsResultModel(
+        from_date=value.from_date,
+        to_date=value.to_date,
+        days_synced=value.days_synced,
+        failures=value.failures,
     )
 
 
