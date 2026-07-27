@@ -14,3 +14,14 @@ body {
 * {
   box-sizing: border-box;
 }
+
+@layer components {
+  /*
+   * Shared focus-ring style for every interactive element (links, buttons, inputs). Only
+   * appears on keyboard focus (:focus-visible), not on mouse click, and uses an offset ring so
+   * it stays visible against any background color, including the adherence scale.
+   */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950;
+  }
+}
