@@ -1,29 +1,51 @@
 /**
- * Settings page (T-070): token management (paste/mask/copy/rotate,
- * test connection), timezone override, sync status, diagnostics.
+ * Settings page (T-070 initial cut, T-080 completes it): token management
+ * (paste/mask/copy/rotate, test connection), timezone override, sync
+ * status + manual "sync now", diagnostic panel.
  *
- * Timezone override and the sync-status/diagnostic panels are lightweight
- * for this task: timezone is stored in localStorage only (no backend field
- * exists yet to persist it); sync status calls the real `/api/sync/status`
- * endpoint (T-045); the diagnostic panel reuses `/health` (DB connectivity)
- * plus the last sync error as a stand-in "last error" surface. A richer
- * diagnostic panel is out of scope here.
+ * Test-connection endpoint choice: spec §9 defines `GET /health` as
+ * unauthenticated and deliberately without a DB check ("both would need
+ * auth to be safe"), so it can't tell us whether *this* token is valid.
+ * "Test connection" therefore hits `GET /api/sync/status` (via the typed
+ * client's `getSyncStatus`) instead — the lightest authenticated GET already
+ * in the API surface (T-045), reusing the existing `apiClient` 401 handling
+ * rather than adding a bespoke check.
+ *
+ * Diagnostic panel "DB connection" resolution: `/health` returns only
+ * `{"status": "ok"}` with no DB check (spec §9), and this task is explicitly
+ * out of bounds for adding a backend DB-check endpoint. `GET /api/sync/status`
+ * does query Postgres (`get_sync_status(session)`, `api/app/api/sync.py`), so
+ * this panel treats that query's own success/failure as the DB-connectivity
+ * signal: if the authenticated sync-status fetch succeeds, the DB round-trip
+ * behind it succeeded too; if it fails (once past the 401 case, which
+ * TokenGate already routes away from this page entirely), that's read as a
+ * DB/server problem. "Last error" is `sync_status.last_error` (last
+ * Intervals sync failure — the only "last error" surface the backend
+ * exposes anywhere).
+ *
+ * Timezone override: no backend field exists for this yet (confirmed by
+ * reading `api/app/api/*.py`), and no shared local-settings module exists in
+ * this codebase to reuse (only `tokenStore.ts` for the token) — so this
+ * stays a page-local `localStorage` key, matching the token store's own
+ * "small module, one constant" shape rather than inventing a bigger
+ * settings-store abstraction for a single field.
  */
 
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch, apiFetchJson } from "../lib/apiClient";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getSyncStatus, syncIntervals } from "../lib/api/client";
+import { ApiError } from "../lib/apiClient";
 import { queryKeys } from "../lib/queryClient";
+import { useToast } from "../design/useToast";
 import { clearToken, getToken, maskToken, setToken } from "../lib/tokenStore";
 
-const TIMEZONE_STORAGE_KEY = "nutrition:timezone-override";
+const TIMEZONE_STORAGE_KEY = "nutribrain:timezone-override";
 
-interface SyncStatusResponse {
-  last_synced_at: string | null;
-  last_error: string | null;
-}
-
-type ConnectionState = { status: "idle" } | { status: "testing" } | { status: "ok" } | { status: "error"; message: string };
+type ConnectionState =
+  | { status: "idle" }
+  | { status: "testing" }
+  | { status: "ok" }
+  | { status: "error"; message: string };
 
 export default function SettingsPage(): JSX.Element {
   return (
@@ -38,6 +60,7 @@ export default function SettingsPage(): JSX.Element {
 }
 
 function TokenSection(): JSX.Element {
+  const { showToast } = useToast();
   const [currentToken, setCurrentToken] = useState<string | null>(() => getToken());
   const [rotateValue, setRotateValue] = useState("");
   const [rotating, setRotating] = useState(false);
@@ -47,14 +70,14 @@ function TokenSection(): JSX.Element {
   async function handleTestConnection(): Promise<void> {
     setConnection({ status: "testing" });
     try {
-      const response = await apiFetch("/api/sync/status");
-      if (!response.ok) {
-        setConnection({ status: "error", message: `Server responded with ${response.status}` });
-        return;
-      }
+      await getSyncStatus();
       setConnection({ status: "ok" });
-    } catch {
-      setConnection({ status: "error", message: "Could not reach the API." });
+      showToast("Connection OK.", "success");
+    } catch (error) {
+      const message =
+        error instanceof ApiError ? `Server responded with ${error.status}.` : "Could not reach the API.";
+      setConnection({ status: "error", message });
+      showToast("Test connection failed.", "error");
     }
   }
 
@@ -73,11 +96,15 @@ function TokenSection(): JSX.Element {
     event.preventDefault();
     const trimmed = rotateValue.trim();
     if (!trimmed) return;
+    // "Rotate" here is client-only: there's no server-side token rotation
+    // (APP_TOKEN is one shared env var, spec §9) — this just re-stores the
+    // pasted token, clearing the old one from localStorage.
     setToken(trimmed);
     setCurrentToken(trimmed);
     setRotateValue("");
     setRotating(false);
     setConnection({ status: "idle" });
+    showToast("Token updated.", "success");
   }
 
   function handleClearToken(): void {
@@ -90,9 +117,7 @@ function TokenSection(): JSX.Element {
       <h3 className="text-lg font-medium">API token</h3>
 
       {currentToken ? (
-        <p className="font-mono text-sm text-slate-700 dark:text-slate-300">
-          {maskToken(currentToken)}
-        </p>
+        <p className="font-mono text-sm text-slate-700 dark:text-slate-300">{maskToken(currentToken)}</p>
       ) : (
         <p className="text-sm text-slate-700 dark:text-slate-300">No token stored.</p>
       )}
@@ -102,28 +127,30 @@ function TokenSection(): JSX.Element {
           type="button"
           onClick={() => void handleCopy()}
           disabled={!currentToken}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           Copy
         </button>
         <button
           type="button"
           onClick={() => setRotating((prev) => !prev)}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:hover:bg-slate-800"
+          aria-expanded={rotating}
+          className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           Rotate token
         </button>
         <button
           type="button"
           onClick={() => void handleTestConnection()}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:hover:bg-slate-800"
+          disabled={connection.status === "testing"}
+          className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
         >
-          Test connection
+          {connection.status === "testing" ? "Testing..." : "Test connection"}
         </button>
         <button
           type="button"
           onClick={handleClearToken}
-          className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+          className="focus-ring rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
         >
           Clear token
         </button>
@@ -135,11 +162,6 @@ function TokenSection(): JSX.Element {
         </p>
       ) : null}
 
-      {connection.status === "testing" ? (
-        <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
-          Testing...
-        </p>
-      ) : null}
       {connection.status === "ok" ? (
         <p role="status" className="text-sm text-green-700 dark:text-green-400">
           Connection OK.
@@ -163,11 +185,11 @@ function TokenSection(): JSX.Element {
             spellCheck={false}
             value={rotateValue}
             onChange={(event) => setRotateValue(event.target.value)}
-            className="w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
           />
           <button
             type="submit"
-            className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+            className="focus-ring rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
           >
             Save new token
           </button>
@@ -191,7 +213,8 @@ function TimezoneSection(): JSX.Element {
     <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
       <h3 className="text-lg font-medium">Timezone</h3>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Defaults to your browser timezone ({browserTimezone}). Stored locally only for now.
+        Defaults to your browser timezone ({browserTimezone}). Stored locally only for now &mdash; no
+        backend field exists yet to persist a timezone override.
       </p>
       <label className="block text-sm font-medium" htmlFor="timezone-override">
         Timezone override
@@ -201,77 +224,86 @@ function TimezoneSection(): JSX.Element {
         type="text"
         value={timezone}
         onChange={(event) => setTimezone(event.target.value)}
-        className="w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900"
+        className="focus-ring w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
       />
     </div>
   );
 }
 
 function SyncStatusSection(): JSX.Element {
-  const { data, isLoading, isError, refetch } = useQuery({
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  const statusQuery = useQuery({
     queryKey: queryKeys.syncStatus(),
-    queryFn: () => apiFetchJson<SyncStatusResponse>("/api/sync/status")
+    queryFn: () => getSyncStatus()
+  });
+
+  // Same mutation pattern as `TodayPage`/`DayPage`'s "Sync intervals now"
+  // (T-074/T-075): `POST /api/sync/intervals` for today's date, toast on
+  // settle, invalidate sync status so this page's own display picks up the
+  // new `lastSyncedAt`/`lastError`.
+  const syncMutation = useMutation({
+    mutationFn: () => syncIntervals(),
+    onError: () => {
+      showToast("Sync failed.", "error");
+    },
+    onSuccess: () => {
+      showToast("Synced with Intervals.", "success");
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.syncStatus() });
+    }
   });
 
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
       <h3 className="text-lg font-medium">Intervals sync</h3>
-      {isLoading ? (
-        <p className="text-sm text-slate-600 dark:text-slate-400">Loading sync status...</p>
-      ) : isError ? (
+      {statusQuery.isLoading ? (
+        <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
+          Loading sync status...
+        </p>
+      ) : statusQuery.isError ? (
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">
           Could not load sync status.
         </p>
       ) : (
         <p className="text-sm text-slate-700 dark:text-slate-300">
-          Last synced: {data?.last_synced_at ?? "never"}
+          Last synced: {statusQuery.data?.lastSyncedAt ?? "never"}
         </p>
       )}
       <button
         type="button"
-        onClick={() => void refetch()}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:hover:bg-slate-800"
+        onClick={() => syncMutation.mutate()}
+        disabled={syncMutation.isPending}
+        className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
       >
-        Sync now
+        {syncMutation.isPending ? "Syncing..." : "Sync now"}
       </button>
-      <p className="text-xs text-slate-500 dark:text-slate-500">
-        &quot;Sync now&quot; currently re-checks status; triggering a live Intervals sync from here is
-        wired up in a later task.
-      </p>
     </div>
   );
 }
 
 function DiagnosticsSection(): JSX.Element {
-  const [health, setHealth] = useState<"unknown" | "ok" | "down">("unknown");
-  const { data: syncStatus } = useQuery({
+  // Reuses the same `syncStatus` query as the section above (TanStack Query
+  // dedupes same-key queries, so this doesn't add a second network call).
+  // See the module doc comment for why this query's success/failure stands
+  // in for a DB-connectivity check.
+  const statusQuery = useQuery({
     queryKey: queryKeys.syncStatus(),
-    queryFn: () => apiFetchJson<SyncStatusResponse>("/api/sync/status")
+    queryFn: () => getSyncStatus()
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/health")
-      .then((response) => {
-        if (!cancelled) setHealth(response.ok ? "ok" : "down");
-      })
-      .catch(() => {
-        if (!cancelled) setHealth("down");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const dbStatus = statusQuery.isLoading ? "checking" : statusQuery.isError ? "unreachable" : "healthy";
 
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
       <h3 className="text-lg font-medium">Diagnostics</h3>
       <p className="text-sm text-slate-700 dark:text-slate-300">
-        DB connection:{" "}
-        {health === "unknown" ? "checking..." : health === "ok" ? "healthy" : "unreachable"}
+        DB connection: {dbStatus === "checking" ? "checking..." : dbStatus}
       </p>
       <p className="text-sm text-slate-700 dark:text-slate-300">
-        Last error: {syncStatus?.last_error ?? "none"}
+        Last error: {statusQuery.data?.lastError ?? "none"}
       </p>
     </div>
   );

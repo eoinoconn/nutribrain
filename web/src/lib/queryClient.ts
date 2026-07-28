@@ -10,10 +10,18 @@
  *   queryKeys.day(localDate)        -> ['day', localDate]
  *   queryKeys.meals(localDate)      -> ['meals', localDate]
  *   queryKeys.targets(localDate)    -> ['targets', localDate]
+ *   queryKeys.targetsList()         -> ['targets', 'list']
  *   queryKeys.foods(filters)        -> ['foods', filters]
  *   queryKeys.templates()           -> ['templates']
  *   queryKeys.syncStatus()          -> ['sync', 'status']
  *   queryKeys.range(from, to, g)    -> ['range', from, to, g]
+ *
+ * `queryKeys.targets(localDate)` scopes the per-day *effective* target
+ * (`GET /api/targets/effective?date=`, a different shape from the raw
+ * versioned list — spec §4). `queryKeys.targetsList()` scopes the raw
+ * versioned list (`GET /api/targets`) shown on the `/targets` manager page
+ * (T-080). Keep these distinct: invalidating one must not stomp on the
+ * other's cache entry.
  *
  * Always use `localDate` (the API-provided local date string), never a
  * client-derived UTC date, per docs/style.md.
@@ -29,6 +37,7 @@ export const queryKeys = {
   day: (localDate: string) => ["day", localDate] as const,
   meals: (localDate: string) => ["meals", localDate] as const,
   targets: (localDate: string) => ["targets", localDate] as const,
+  targetsList: () => ["targets", "list"] as const,
   foods: (filters?: Record<string, unknown>) => ["foods", filters ?? {}] as const,
   templates: () => ["templates"] as const,
   syncStatus: () => ["sync", "status"] as const,
