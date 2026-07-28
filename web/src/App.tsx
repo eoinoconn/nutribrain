@@ -2,6 +2,7 @@ import { Link, Route, Routes } from "react-router-dom";
 import TokenGate from "./auth/TokenGate";
 import TodayPage from "./pages/TodayPage";
 import DayPage from "./pages/DayPage";
+import TrendsPage from "./pages/TrendsPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -43,7 +44,7 @@ export default function App(): JSX.Element {
           <Routes>
             <Route path="/" element={<TodayPage />} />
             <Route path="/day/:date" element={<DayPage />} />
-            <Route path="/trends" element={<PlaceholderPage title="Trends" />} />
+            <Route path="/trends" element={<TrendsPage />} />
             <Route path="/calendar" element={<PlaceholderPage title="Calendar" />} />
             <Route path="/foods" element={<PlaceholderPage title="Foods" />} />
             <Route path="/templates" element={<PlaceholderPage title="Templates" />} />

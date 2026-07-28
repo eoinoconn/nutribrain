@@ -13,6 +13,7 @@
  *   queryKeys.foods(filters)        -> ['foods', filters]
  *   queryKeys.templates()           -> ['templates']
  *   queryKeys.syncStatus()          -> ['sync', 'status']
+ *   queryKeys.range(from, to, g)    -> ['range', from, to, g]
  *
  * Always use `localDate` (the API-provided local date string), never a
  * client-derived UTC date, per docs/style.md.
@@ -30,7 +31,9 @@ export const queryKeys = {
   targets: (localDate: string) => ["targets", localDate] as const,
   foods: (filters?: Record<string, unknown>) => ["foods", filters ?? {}] as const,
   templates: () => ["templates"] as const,
-  syncStatus: () => ["sync", "status"] as const
+  syncStatus: () => ["sync", "status"] as const,
+  range: (from: string, to: string, granularity: string = "day") =>
+    ["range", from, to, granularity] as const
 };
 
 function isAuthError(error: unknown): boolean {
