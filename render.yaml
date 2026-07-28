@@ -25,7 +25,8 @@ services:
       - key: SENTRY_DSN
         sync: false
 
-  - type: static
+  - type: web
+    runtime: static
     name: nutrition-web
     rootDir: web
     buildCommand: npm ci && npm run build
