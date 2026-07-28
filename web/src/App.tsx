@@ -3,6 +3,7 @@ import TokenGate from "./auth/TokenGate";
 import TodayPage from "./pages/TodayPage";
 import DayPage from "./pages/DayPage";
 import TrendsPage from "./pages/TrendsPage";
+import CalendarPage from "./pages/CalendarPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -45,7 +46,7 @@ export default function App(): JSX.Element {
             <Route path="/" element={<TodayPage />} />
             <Route path="/day/:date" element={<DayPage />} />
             <Route path="/trends" element={<TrendsPage />} />
-            <Route path="/calendar" element={<PlaceholderPage title="Calendar" />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/foods" element={<PlaceholderPage title="Foods" />} />
             <Route path="/templates" element={<PlaceholderPage title="Templates" />} />
             <Route path="/targets" element={<PlaceholderPage title="Targets" />} />
