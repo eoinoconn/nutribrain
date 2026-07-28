@@ -21,8 +21,18 @@ import { queryKeys } from "../lib/queryClient";
 import { useToast } from "../design/useToast";
 import Skeleton from "../design/Skeleton";
 import EmptyState from "../design/EmptyState";
-import type { CreateMealRequest, DayResponse, ItemMacros, MealItemRequest, MealType } from "../lib/api/types";
+import type { CreateMealRequest, DayResponse, MealType } from "../lib/api/types";
 import { MealEditor, type MealEditorValue } from "../components/MealEditor";
+import {
+  CalorieProgress,
+  DayHeader,
+  MEAL_TYPE_LABELS,
+  MEAL_TYPE_ORDER,
+  MacroBars,
+  MicroRow,
+  formatCalories
+} from "../components/DaySummary";
+import { buildCreateMealRequest } from "../lib/mealForms";
 
 function todayLocalDate(): string {
   // Best-effort initial fetch key only; the header's displayed date always
@@ -32,57 +42,6 @@ function todayLocalDate(): string {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function formatCalories(value: number): string {
-  return Math.round(value).toLocaleString();
-}
-
-function formatGrams(value: number): string {
-  return value.toFixed(1);
-}
-
-const MEAL_TYPE_ORDER: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
-
-const MEAL_TYPE_LABELS: Record<MealType, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack"
-};
-
-function mealEditorItemToRequest(item: MealEditorValue["items"][number]): MealItemRequest | null {
-  if (item.quantity === null || item.quantity <= 0) {
-    return null;
-  }
-  return {
-    name: item.name,
-    quantity: item.quantity,
-    quantityUnit: item.quantityUnit,
-    foodId: item.isAdHoc ? null : item.foodId,
-    calories: item.isAdHoc ? item.calories : null,
-    proteinG: item.isAdHoc ? item.proteinG : null,
-    carbsG: item.isAdHoc ? item.carbsG : null,
-    fatG: item.isAdHoc ? item.fatG : null,
-    fiberG: item.isAdHoc ? item.fiberG : null,
-    satFatG: item.isAdHoc ? item.satFatG : null,
-    sodiumMg: item.isAdHoc ? item.sodiumMg : null
-  };
-}
-
-/**
- * Builds a timezone-aware ISO datetime from a `MealEditorValue.time`
- * (`HH:mm`) and the current day. `POST /api/meals` rejects a naive
- * datetime (backend domain layer requires tz-awareness) — constructing a
- * `Date` from local components and reading back `toISOString()` gives a
- * `Z`-suffixed UTC instant that correctly accounts for the browser's
- * offset (and DST) for that date, rather than string-concatenating an
- * offset-less timestamp.
- */
-function buildLoggedAt(localDate: string, time: string): string {
-  const [year = 0, month = 1, day = 1] = localDate.split("-").map(Number);
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return new Date(year, month - 1, day, hours, minutes, 0).toISOString();
 }
 
 export default function TodayPage(): JSX.Element {
@@ -143,20 +102,12 @@ export default function TodayPage(): JSX.Element {
     if (!editorValue) {
       return;
     }
-    const items = editorValue.items
-      .map(mealEditorItemToRequest)
-      .filter((item): item is MealItemRequest => item !== null);
-    if (items.length === 0) {
+    const request = buildCreateMealRequest(editorValue, dayQuery.data?.date ?? localDate);
+    if (!request) {
       showToast("Add at least one item before saving.", "error");
       return;
     }
-    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    logMealMutation.mutate({
-      items,
-      loggedAt: buildLoggedAt(dayQuery.data?.date ?? localDate, editorValue.time),
-      localTz,
-      mealType: editorValue.mealType
-    });
+    logMealMutation.mutate(request);
   }
 
   function toggleGroup(key: string): void {
@@ -202,7 +153,7 @@ export default function TodayPage(): JSX.Element {
 
   return (
     <section className="space-y-8">
-      <Header day={day} />
+      <DayHeader day={day} title="Today" />
 
       <CalorieProgress totals={day.dayTotals} target={day.effectiveTarget} />
 
@@ -292,137 +243,5 @@ export default function TodayPage(): JSX.Element {
         />
       )}
     </section>
-  );
-}
-
-function Header({ day }: { day: DayResponse }): JSX.Element {
-  const target = day.effectiveTarget;
-  return (
-    <header className="space-y-1">
-      <h1 className="text-3xl font-bold tracking-tight">Today &mdash; {day.date}</h1>
-      {target ? (
-        target.caloriesOut !== null ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
-            {formatCalories(target.caloriesOut)} out)
-          </p>
-        ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            target {formatCalories(target.effectiveCalories)} (no activity data)
-          </p>
-        )
-      ) : (
-        <p className="text-sm text-slate-600 dark:text-slate-400">No target set.</p>
-      )}
-    </header>
-  );
-}
-
-function CalorieProgress({
-  totals,
-  target
-}: {
-  totals: ItemMacros;
-  target: DayResponse["effectiveTarget"];
-}): JSX.Element {
-  const targetCalories = target?.effectiveCalories ?? null;
-  const fraction = targetCalories ? Math.min(totals.calories / targetCalories, 1) : 0;
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - fraction);
-
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-hidden="true">
-        <circle cx="70" cy="70" r={radius} fill="none" stroke="currentColor" strokeWidth="12" className="text-slate-200 dark:text-slate-800" />
-        <circle
-          cx="70"
-          cy="70"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="12"
-          strokeLinecap="round"
-          className="text-sky-600 transition-[stroke-dashoffset]"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          transform="rotate(-90 70 70)"
-        />
-      </svg>
-      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-        {targetCalories !== null
-          ? `${formatCalories(totals.calories)} / ${formatCalories(targetCalories)} calories`
-          : `${formatCalories(totals.calories)} calories (no target set)`}
-      </p>
-    </div>
-  );
-}
-
-function MacroBar({
-  label,
-  grams,
-  targetGrams
-}: {
-  label: string;
-  grams: number;
-  targetGrams: number | null;
-}): JSX.Element {
-  const fraction = targetGrams ? Math.min(grams / targetGrams, 1) : 0;
-  const summary =
-    targetGrams !== null
-      ? `${formatGrams(grams)} / ${formatGrams(targetGrams)} g ${label.toLowerCase()}`
-      : `${formatGrams(grams)} g ${label.toLowerCase()} (no target set)`;
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between text-sm">
-        <span className="font-medium text-slate-700 dark:text-slate-300">{label}</span>
-        <span className="text-slate-600 dark:text-slate-400">
-          {targetGrams !== null ? `${formatGrams(grams)} / ${formatGrams(targetGrams)} g` : `${formatGrams(grams)} g`}
-        </span>
-      </div>
-      <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-        <div
-          className="h-full rounded-full bg-sky-600"
-          style={{ width: targetGrams !== null ? `${fraction * 100}%` : "100%" }}
-        />
-      </div>
-      <p className="sr-only">{summary}</p>
-    </div>
-  );
-}
-
-function MacroBars({
-  totals,
-  target
-}: {
-  totals: ItemMacros;
-  target: DayResponse["effectiveTarget"];
-}): JSX.Element {
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <MacroBar label="Protein" grams={totals.proteinG} targetGrams={target?.proteinG ?? null} />
-      <MacroBar label="Carbs" grams={totals.carbsG} targetGrams={target?.carbsG ?? null} />
-      <MacroBar label="Fat" grams={totals.fatG} targetGrams={target?.fatG ?? null} />
-    </div>
-  );
-}
-
-function MicroRow({ totals }: { totals: ItemMacros }): JSX.Element {
-  return (
-    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500 dark:text-slate-500">
-      <div className="flex gap-1">
-        <dt>Fiber</dt>
-        <dd>{totals.fiberG !== null ? `${formatGrams(totals.fiberG)} g` : "—"}</dd>
-      </div>
-      <div className="flex gap-1">
-        <dt>Sat fat</dt>
-        <dd>{totals.satFatG !== null ? `${formatGrams(totals.satFatG)} g` : "—"}</dd>
-      </div>
-      <div className="flex gap-1">
-        <dt>Sodium</dt>
-        <dd>{totals.sodiumMg !== null ? `${formatCalories(totals.sodiumMg)} mg` : "—"}</dd>
-      </div>
-    </dl>
   );
 }
