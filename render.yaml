@@ -12,8 +12,8 @@ services:
         sync: false
       - key: APP_TOKEN             # generated once
         sync: false
-      - key: CORS_ORIGIN
-        value: https://nutrition-web.onrender.com
+      - key: CORS_ORIGIN            # set after first deploy, once nutrition-web's actual URL is known
+        sync: false
       - key: INTERVALS_API_KEY
         sync: false
       - key: INTERVALS_ATHLETE_ID
@@ -32,8 +32,8 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_API_BASE
-        value: https://nutrition-api.onrender.com
+      - key: VITE_API_BASE           # set after first deploy, once nutrition-api's actual URL is known
+        sync: false
       - key: SENTRY_DSN
         sync: false
 
