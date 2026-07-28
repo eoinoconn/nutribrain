@@ -519,7 +519,7 @@ Optimistic mutations with rollback on every write, success and failure toasts, f
 
 ## Phase 8 — Deploy and operations
 
-### T-090 · render.yaml
+### T-090 · render.yaml ✅
 **Depends:** T-031, T-003 **Spec:** §10
 All three services as specified, migrations in the API build command, health check path, cron at 03:00 UTC, env var wiring including `fromService` references for the cron.
 

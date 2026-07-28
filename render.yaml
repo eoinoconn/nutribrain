@@ -1,2 +1,53 @@
-# Placeholder Render configuration
-# TODO: define services, env vars, and deploy settings.
+services:
+  - type: web
+    name: nutrition-api
+    runtime: python
+    rootDir: api
+    plan: starter
+    buildCommand: uv sync && uv run alembic upgrade head
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL          # from Neon
+        sync: false
+      - key: APP_TOKEN             # generated once
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://nutrition-web.onrender.com
+      - key: INTERVALS_API_KEY
+        sync: false
+      - key: INTERVALS_ATHLETE_ID
+        sync: false
+      - key: TZ
+        value: Europe/Dublin
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: static
+    name: nutrition-web
+    rootDir: web
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE
+        value: https://nutrition-api.onrender.com
+      - key: SENTRY_DSN
+        sync: false
+
+  - type: cron
+    name: nutrition-cron
+    runtime: python
+    rootDir: api
+    schedule: "0 3 * * *"          # 03:00 UTC
+    buildCommand: uv sync
+    startCommand: uv run python -m app.intervals.sync_recent
+    envVars:
+      - fromService: { type: web, name: nutrition-api, envVarKey: DATABASE_URL }
+      - fromService: { type: web, name: nutrition-api, envVarKey: INTERVALS_API_KEY }
+      - fromService: { type: web, name: nutrition-api, envVarKey: INTERVALS_ATHLETE_ID }
+      - key: INTERVALS_SYNC_DAYS
+        value: "3"
+      - key: TZ
+        value: Europe/Dublin
