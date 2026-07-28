@@ -70,9 +70,19 @@ function mealEditorItemToRequest(item: MealEditorValue["items"][number]): MealIt
   };
 }
 
-/** Builds the local ISO datetime NutriBrain's `POST /api/meals` expects from a `MealEditorValue.time` (`HH:mm`) and the current day. */
+/**
+ * Builds a timezone-aware ISO datetime from a `MealEditorValue.time`
+ * (`HH:mm`) and the current day. `POST /api/meals` rejects a naive
+ * datetime (backend domain layer requires tz-awareness) — constructing a
+ * `Date` from local components and reading back `toISOString()` gives a
+ * `Z`-suffixed UTC instant that correctly accounts for the browser's
+ * offset (and DST) for that date, rather than string-concatenating an
+ * offset-less timestamp.
+ */
 function buildLoggedAt(localDate: string, time: string): string {
-  return `${localDate}T${time}:00`;
+  const [year = 0, month = 1, day = 1] = localDate.split("-").map(Number);
+  const [hours = 0, minutes = 0] = time.split(":").map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0).toISOString();
 }
 
 export default function TodayPage(): JSX.Element {

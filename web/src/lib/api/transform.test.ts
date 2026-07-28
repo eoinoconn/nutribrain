@@ -12,7 +12,7 @@ describe("keysToCamel", () => {
     expect(keysToCamel(input)).toEqual({
       foodId: 1,
       quantityUnit: "g",
-      macros: { satFatG: "1.5", sodiumMg: null }
+      macros: { satFatG: 1.5, sodiumMg: null }
     });
   });
 
@@ -26,6 +26,26 @@ describe("keysToCamel", () => {
     expect(keysToCamel(null)).toBeNull();
     expect(keysToCamel(42)).toBe(42);
     expect(keysToCamel("effective_from")).toBe("effective_from");
+  });
+
+  it("coerces Decimal-serialized numeric strings to numbers, but leaves non-numeric strings alone", () => {
+    const input = {
+      calories: "350.000",
+      quantity: "-12.5",
+      local_date: "2026-07-27",
+      logged_at: "2026-07-27T08:30:00+01:00",
+      quantity_unit: "g",
+      name: "Overnight Oats"
+    };
+
+    expect(keysToCamel(input)).toEqual({
+      calories: 350,
+      quantity: -12.5,
+      localDate: "2026-07-27",
+      loggedAt: "2026-07-27T08:30:00+01:00",
+      quantityUnit: "g",
+      name: "Overnight Oats"
+    });
   });
 });
 

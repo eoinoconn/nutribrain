@@ -63,12 +63,16 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 cd web
+cp .env.example .env   # set VITE_API_BASE to the running API's origin
 npm ci
 npm run dev -- --host --port 5173
 ```
 
 - Runs on http://localhost:5173
 - Requires a valid `APP_TOKEN` pasted on first visit
+- `VITE_API_BASE` must point at the API's origin (`http://localhost:8000` for
+  local dev) — the dashboard and API are served from different origins even
+  in development, so requests are never same-origin by default
 
 #### Cron entrypoint (intervals sync)
 

@@ -296,6 +296,11 @@ describe("TodayPage", () => {
     expect(await screen.findByText(/meal logged/i)).toBeInTheDocument();
     await waitFor(() => expect(mockedGetDay).toHaveBeenCalledTimes(2));
     expect(screen.queryByRole("form", { name: /meal editor/i })).not.toBeInTheDocument();
+
+    // POST /api/meals rejects a naive (offset-less) logged_at as a domain
+    // error — guard against regressing to string-concatenating one.
+    const [request] = mockedCreateMeal.mock.calls[0]!;
+    expect(request.loggedAt).toMatch(/Z$|[+-]\d{2}:\d{2}$/);
   });
 
   it("shows an error toast and keeps the editor open when logging a meal fails", async () => {

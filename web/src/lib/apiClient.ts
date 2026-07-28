@@ -1,6 +1,9 @@
 /**
  * Fetch wrapper for the `/api` backend (T-070).
  *
+ * - Prefixes every call with `VITE_API_BASE` (spec Appendix A) so requests
+ *   reach the API's own origin rather than the Vite dev server / static
+ *   site the dashboard is served from. Empty/unset means same-origin.
  * - Attaches `Authorization: Bearer <token>` from localStorage to every call.
  * - On a 401 response, clears the stored token (dispatching
  *   `TOKEN_CLEARED_EVENT` with reason "invalid") and throws an `ApiError`
@@ -9,6 +12,8 @@
  */
 
 import { clearToken, getToken } from "./tokenStore";
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export class ApiError extends Error {
   status: number;
@@ -56,7 +61,7 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}): Pro
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(path, { ...options, headers });
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   if (response.status === 401) {
     const body = await parseErrorBody(response);

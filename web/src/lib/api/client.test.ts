@@ -19,13 +19,19 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-/** Extracts the `[path, init]` args of the nth `fetch` call, typed. */
+/**
+ * Extracts the `[path, init]` args of the nth `fetch` call, typed. The path
+ * is normalized to its pathname+search, stripping any `VITE_API_BASE` origin
+ * prefix so assertions stay valid regardless of the configured API base.
+ */
 function fetchCall(fetchMock: ReturnType<typeof vi.fn>, callIndex = 0): [string, RequestInit] {
   const call = fetchMock.mock.calls[callIndex] as [string, RequestInit] | undefined;
   if (!call) {
     throw new Error(`fetch was not called at index ${callIndex}`);
   }
-  return call;
+  const [rawPath, init] = call;
+  const url = new URL(rawPath, "http://placeholder.invalid");
+  return [`${url.pathname}${url.search}`, init];
 }
 
 describe("typed API client", () => {
@@ -117,9 +123,9 @@ describe("typed API client", () => {
     const foods = await listFoods();
 
     expect(foods[0]).toMatchObject({
-      servingSize: "100",
+      servingSize: 100,
       servingUnit: "g",
-      proteinG: "31",
+      proteinG: 31,
       isFavorite: false,
       lastLoggedAt: null,
       loggedCount: 0

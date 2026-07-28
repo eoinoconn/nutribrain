@@ -557,6 +557,35 @@ A script generating ~90 days of plausible meals, foods, templates, targets, and 
 
 ---
 
+## Known issues
+
+Bugs found in already-merged tasks, discovered incidentally while working on
+later tasks. Not blocking the tasks above; fix opportunistically or pick up
+as a dedicated task.
+
+### KI-001 — `POST /api/meals` 500s on a naive `logged_at` instead of a 4xx
+
+**Found:** manually exercising the Today view (T-074) against a live API
+during phase-7, 2026-07-27.
+
+**Repro:** `POST /api/meals` with `logged_at` missing a UTC offset (e.g.
+`"2026-07-27T08:30:00"` instead of `"2026-07-27T08:30:00+01:00"`) raises a
+bare `ValueError("logged_at must be timezone-aware")` in
+`api/app/domain/meal_logging.py:70`. It isn't a `DomainError` subclass, so
+nothing maps it to an Appendix C error code — it surfaces as an unhandled
+500 rather than a 4xx validation error.
+
+**Where:** `api/app/api/meals.py` (`CreateMealRequest.logged_at: datetime` —
+Pydantic doesn't enforce tz-awareness on plain `datetime` fields) and
+`api/app/domain/meal_logging.py:70` (T-023, already merged before phase-7).
+
+**Suggested fix:** either a Pydantic validator on `CreateMealRequest` that
+rejects naive datetimes with a proper 422, or a `DomainError` subclass
+(`invalid_timestamp` or similar) raised instead of the bare `ValueError`,
+caught by the existing exception-handler mapping from T-031.
+
+---
+
 ## Parallelization map
 
 | Wave | Tasks | Notes |
