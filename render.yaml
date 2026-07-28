@@ -45,9 +45,21 @@ services:
     buildCommand: uv sync
     startCommand: uv run python -m app.intervals.sync_recent
     envVars:
-      - fromService: { type: web, name: nutrition-api, envVarKey: DATABASE_URL }
-      - fromService: { type: web, name: nutrition-api, envVarKey: INTERVALS_API_KEY }
-      - fromService: { type: web, name: nutrition-api, envVarKey: INTERVALS_ATHLETE_ID }
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: nutrition-api
+          envVarKey: DATABASE_URL
+      - key: INTERVALS_API_KEY
+        fromService:
+          type: web
+          name: nutrition-api
+          envVarKey: INTERVALS_API_KEY
+      - key: INTERVALS_ATHLETE_ID
+        fromService:
+          type: web
+          name: nutrition-api
+          envVarKey: INTERVALS_ATHLETE_ID
       - key: INTERVALS_SYNC_DAYS
         value: "3"
       - key: TZ
