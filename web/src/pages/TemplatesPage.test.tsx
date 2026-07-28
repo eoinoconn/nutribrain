@@ -175,6 +175,44 @@ describe("TemplatesPage", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("shows the renamed template optimistically in the list before the request settles", async () => {
+    const template = makeTemplate();
+    mockedListTemplates.mockResolvedValue([template]);
+    let resolveUpdate: (value: Template) => void = () => undefined;
+    mockedUpdateTemplate.mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      })
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /weekday breakfast/i }));
+    fireEvent.change(screen.getByLabelText(/template name/i), { target: { value: "Renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    // The list row behind the still-open modal reflects the new name before the mutation resolves.
+    expect(await screen.findByRole("button", { name: "Renamed" })).toBeInTheDocument();
+
+    resolveUpdate({ ...template, name: "Renamed" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("rolls back an optimistic rename on failure and shows an error toast", async () => {
+    const template = makeTemplate();
+    mockedListTemplates.mockResolvedValue([template]);
+    mockedUpdateTemplate.mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /weekday breakfast/i }));
+    fireEvent.change(screen.getByLabelText(/template name/i), { target: { value: "Renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    // The dialog's own inline alert and the global toast both surface the same message, so
+    // assert on count rather than a single findByText (which throws on ambiguous matches).
+    await waitFor(() => expect(screen.getAllByText(/could not update template/i).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Renamed" })).not.toBeInTheDocument());
+  });
+
   it("deletes a template optimistically with a success toast", async () => {
     mockedListTemplates.mockResolvedValueOnce([makeTemplate()]);
     mockedListTemplates.mockResolvedValue([]);

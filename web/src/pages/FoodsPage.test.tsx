@@ -164,6 +164,46 @@ describe("FoodsPage", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("shows the edited value optimistically in the table before the request settles", async () => {
+    mockedListFoods.mockResolvedValue([makeFood({ calories: 165 })]);
+    let resolveUpdate: (value: { food: FoodSearchResult; recomputeCount: number }) => void = () => undefined;
+    mockedUpdateFood.mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpdate = resolve;
+      })
+    );
+    renderPage();
+    await screen.findByText("Chicken breast");
+
+    fireEvent.click(screen.getByRole("button", { name: "Chicken breast" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^calories$/i), { target: { value: "999" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save changes/i }));
+
+    // Optimistic patch lands in the table row immediately, before the mutation resolves.
+    expect(await screen.findByRole("cell", { name: "999" })).toBeInTheDocument();
+
+    resolveUpdate({ food: makeFood({ calories: 999 }), recomputeCount: 0 });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("rolls back an optimistic edit and shows an error toast on failure", async () => {
+    mockedListFoods.mockResolvedValue([makeFood({ calories: 165 })]);
+    mockedUpdateFood.mockRejectedValue(new ApiError(422, "validation error", { message: "Nope" }));
+    renderPage();
+    await screen.findByText("Chicken breast");
+
+    fireEvent.click(screen.getByRole("button", { name: "Chicken breast" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/^calories$/i), { target: { value: "999" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save changes/i }));
+
+    expect(await screen.findByText(/could not update food/i)).toBeInTheDocument();
+    // Row reverts to the original value once the rollback lands.
+    await waitFor(() => expect(screen.queryByRole("cell", { name: "999" })).not.toBeInTheDocument());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("closes the edit modal on Escape without saving", async () => {
     mockedListFoods.mockResolvedValue([makeFood()]);
     renderPage();

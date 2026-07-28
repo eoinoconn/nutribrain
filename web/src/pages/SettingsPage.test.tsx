@@ -46,6 +46,12 @@ describe("SettingsPage", () => {
     window.localStorage.clear();
   });
 
+  it("shows a loading skeleton (not bare text) for the sync status section on first paint", () => {
+    mockedGetSyncStatus.mockReturnValue(new Promise(() => {}));
+    renderPage();
+    expect(screen.getByRole("status", { name: /loading sync status/i })).toBeInTheDocument();
+  });
+
   it("shows 'No token stored' when there is no token", async () => {
     renderPage();
     expect(await screen.findByText("No token stored.")).toBeInTheDocument();
@@ -87,6 +93,17 @@ describe("SettingsPage", () => {
     expect(await screen.findByText(maskToken("sk-newtoken999999"))).toBeInTheDocument();
     expect(window.localStorage.getItem(TOKEN_STORAGE_KEY)).toBe("sk-newtoken999999");
     expect(await screen.findByText(/token updated/i)).toBeInTheDocument();
+  });
+
+  it("shows a success toast when the token is cleared", async () => {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, "sk-abcdef123456");
+    renderPage();
+    await screen.findByText(maskToken("sk-abcdef123456"));
+
+    fireEvent.click(screen.getByRole("button", { name: /clear token/i }));
+
+    expect(await screen.findByText("No token stored.")).toBeInTheDocument();
+    expect(await screen.findByText(/token cleared/i)).toBeInTheDocument();
   });
 
   it("test connection succeeds via the authenticated sync-status endpoint", async () => {

@@ -196,6 +196,12 @@ export default function FoodsPage(): JSX.Element {
     }
   });
 
+  // No optimistic *data* patch here (unlike `favoriteMutation`/`updateFoodMutation` below):
+  // a new food has no id yet, so there's nothing to key an optimistic list row on, and
+  // inserting a placeholder row users could pick from (the food-search combobox reads this
+  // same list) risks logging a meal against an id that never lands. Cancel/rollback of the
+  // *query* still doesn't apply for a create, so this mutation only needs settle-time
+  // invalidation, matching the documented exception shape from `DayPage`'s edit-item mutation.
   const addFoodMutation = useMutation({
     mutationFn: (payload: CreateFoodRequest) => createFood(payload),
     onSuccess: () => {
@@ -220,8 +226,26 @@ export default function FoodsPage(): JSX.Element {
     }
   });
 
+  // Unlike `DayPage`'s edit-item mutation (which skips the optimistic data patch because
+  // computing resulting macros/grouping client-side would be domain logic), patching the
+  // edited *food* fields here is safe: this only echoes back the same field values the form
+  // just submitted onto the food row the table already renders, not a derived read-time
+  // computation (e.g. it never touches `recomputeCount` or any meal_item). The rollback path
+  // still guards against a domain-level rejection (e.g. `serving_unit_immutable`-adjacent
+  // validation failures) undoing a badge that never actually took effect.
   const updateFoodMutation = useMutation({
     mutationFn: ({ foodId, payload }: { foodId: number; payload: UpdateFoodRequest }) => updateFood(foodId, payload),
+    onMutate: async ({ foodId, payload }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.foods(filters) });
+      const previous = queryClient.getQueryData<FoodSearchResult[]>(queryKeys.foods(filters));
+      if (previous) {
+        queryClient.setQueryData(
+          queryKeys.foods(filters),
+          previous.map((food) => (food.id === foodId ? { ...food, ...payload } : food))
+        );
+      }
+      return { previous };
+    },
     onSuccess: (result) => {
       showToast(
         result.recomputeCount > 0
@@ -233,7 +257,10 @@ export default function FoodsPage(): JSX.Element {
       setEditValues(null);
       setEditError(null);
     },
-    onError: (error) => {
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.foods(filters), context.previous);
+      }
       const body = domainErrorBody(error);
       setEditError(body?.message ?? "Could not update food.");
       showToast("Could not update food.", "error");

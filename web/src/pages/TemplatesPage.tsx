@@ -102,6 +102,10 @@ export default function TemplatesPage(): JSX.Element {
     queryFn: () => listTemplates()
   });
 
+  // No optimistic *data* patch (same reasoning as `FoodsPage`'s addFoodMutation): a new
+  // template has no id yet, so there's no existing list row to key an optimistic insert on,
+  // and templates carry a server-assigned item list that this page doesn't want to guess at
+  // client-side. Settle-time invalidation is enough here.
   const createTemplateMutation = useMutation({
     mutationFn: (payload: NonNullable<ReturnType<typeof buildCreateTemplateRequest>>) => createTemplate(payload),
     onSuccess: () => {
@@ -117,14 +121,35 @@ export default function TemplatesPage(): JSX.Element {
     }
   });
 
+  // Optimistic patch of the name only (not `items`): the request payload's items are in the
+  // create/update wire shape (`TemplateItemRequest`, food-id-or-ad-hoc-macros), not the
+  // `TemplateItem` read shape the list/cache holds (which includes server-assigned item ids)
+  // — patching those in client-side would risk fabricating ids that don't match what the
+  // server actually persists. The name is a plain string with no such shape mismatch, so it's
+  // safe to reflect immediately; the settle-time invalidation picks up the authoritative items.
   const updateTemplateMutation = useMutation({
     mutationFn: ({ templateId, payload }: { templateId: number; payload: NonNullable<ReturnType<typeof buildUpdateTemplateRequest>> }) =>
       updateTemplate(templateId, payload),
+    onMutate: async ({ templateId, payload }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.templates() });
+      const previous = queryClient.getQueryData<Template[]>(queryKeys.templates());
+      const nextName = payload.name;
+      if (previous && nextName) {
+        queryClient.setQueryData(
+          queryKeys.templates(),
+          previous.map((template) => (template.id === templateId ? { ...template, name: nextName } : template))
+        );
+      }
+      return { previous };
+    },
     onSuccess: () => {
       showToast("Template updated.", "success");
       handleCloseEdit();
     },
-    onError: (error) => {
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.templates(), context.previous);
+      }
       setEditError(domainErrorMessage(error) ?? "Could not update template.");
       showToast("Could not update template.", "error");
     },
@@ -160,6 +185,10 @@ export default function TemplatesPage(): JSX.Element {
     }
   });
 
+  // Cancels/snapshots the day query (so a stale in-flight fetch can't clobber the rollback)
+  // but does not optimistically patch its data: like DayPage's edit-item mutation, computing
+  // the resulting meal group/macro totals from a template's items client-side would be domain
+  // logic (CLAUDE.md), so this relies on the settle-time invalidation to fetch the true state.
   const logTemplateMutation = useMutation({
     mutationFn: ({ templateId, payload }: { templateId: number; payload: LogTemplateRequest }) =>
       logTemplate(templateId, payload),

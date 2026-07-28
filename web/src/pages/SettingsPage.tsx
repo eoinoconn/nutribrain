@@ -37,6 +37,7 @@ import { getSyncStatus, syncIntervals } from "../lib/api/client";
 import { ApiError } from "../lib/apiClient";
 import { queryKeys } from "../lib/queryClient";
 import { useToast } from "../design/useToast";
+import Skeleton from "../design/Skeleton";
 import { clearToken, getToken, maskToken, setToken } from "../lib/tokenStore";
 
 const TIMEZONE_STORAGE_KEY = "nutribrain:timezone-override";
@@ -64,7 +65,6 @@ function TokenSection(): JSX.Element {
   const [currentToken, setCurrentToken] = useState<string | null>(() => getToken());
   const [rotateValue, setRotateValue] = useState("");
   const [rotating, setRotating] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>({ status: "idle" });
 
   async function handleTestConnection(): Promise<void> {
@@ -85,11 +85,10 @@ function TokenSection(): JSX.Element {
     if (!currentToken) return;
     try {
       await navigator.clipboard.writeText(currentToken);
-      setCopyFeedback("Copied to clipboard.");
+      showToast("Copied to clipboard.", "success");
     } catch {
-      setCopyFeedback("Copy failed — select and copy manually.");
+      showToast("Copy failed — select and copy manually.", "error");
     }
-    window.setTimeout(() => setCopyFeedback(null), 3000);
   }
 
   function handleRotateSubmit(event: React.FormEvent<HTMLFormElement>): void {
@@ -110,6 +109,7 @@ function TokenSection(): JSX.Element {
   function handleClearToken(): void {
     clearToken("manual");
     setCurrentToken(null);
+    showToast("Token cleared.", "success");
   }
 
   return (
@@ -155,12 +155,6 @@ function TokenSection(): JSX.Element {
           Clear token
         </button>
       </div>
-
-      {copyFeedback ? (
-        <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
-          {copyFeedback}
-        </p>
-      ) : null}
 
       {connection.status === "ok" ? (
         <p role="status" className="text-sm text-green-700 dark:text-green-400">
@@ -260,9 +254,7 @@ function SyncStatusSection(): JSX.Element {
     <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
       <h3 className="text-lg font-medium">Intervals sync</h3>
       {statusQuery.isLoading ? (
-        <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
-          Loading sync status...
-        </p>
+        <Skeleton className="h-5 w-48" label="Loading sync status" />
       ) : statusQuery.isError ? (
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">
           Could not load sync status.

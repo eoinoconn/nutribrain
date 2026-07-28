@@ -174,4 +174,44 @@ describe("MealEditor", () => {
     const lastValue = handleChange.mock.calls.at(-1)?.[0];
     expect(lastValue?.items[0]).toMatchObject({ foodId: 1, name: "Chicken breast", isAdHoc: false });
   });
+
+  it("lets the user pick a food search result with the keyboard alone (Arrow keys + Enter)", async () => {
+    mockedListFoods.mockResolvedValue([
+      makeFood({ id: 1, name: "Chicken breast", isFavorite: true }),
+      makeFood({ id: 2, name: "Chickpeas", isFavorite: false })
+    ]);
+    const handleChange = vi.fn<(value: MealEditorValue) => void>();
+    renderEditor({ onChange: handleChange });
+
+    const searchBox = screen.getByRole("combobox", { name: /food \(item 1\)/i });
+    fireEvent.focus(searchBox);
+    fireEvent.change(searchBox, { target: { value: "chick" } });
+
+    await screen.findByRole("option", { name: /favorite chicken breast/i });
+
+    // ArrowDown twice wraps back to the first option; Enter picks whatever is highlighted.
+    fireEvent.keyDown(searchBox, { key: "ArrowDown" });
+    fireEvent.keyDown(searchBox, { key: "ArrowDown" });
+    fireEvent.keyDown(searchBox, { key: "ArrowUp" });
+    expect(searchBox).toHaveAttribute("aria-activedescendant");
+
+    fireEvent.keyDown(searchBox, { key: "Enter" });
+
+    const lastValue = handleChange.mock.calls.at(-1)?.[0];
+    expect(lastValue?.items[0]).toMatchObject({ foodId: 1, name: "Chicken breast", isAdHoc: false });
+  });
+
+  it("closes the food search results on Escape without picking anything", async () => {
+    mockedListFoods.mockResolvedValue([makeFood({ id: 1, name: "Chicken breast" })]);
+    renderEditor();
+
+    const searchBox = screen.getByRole("combobox", { name: /food \(item 1\)/i });
+    fireEvent.focus(searchBox);
+    fireEvent.change(searchBox, { target: { value: "chick" } });
+
+    await screen.findByRole("option", { name: "Chicken breast" });
+    fireEvent.keyDown(searchBox, { key: "Escape" });
+
+    expect(screen.queryByRole("option", { name: "Chicken breast" })).not.toBeInTheDocument();
+  });
 });
