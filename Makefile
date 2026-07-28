@@ -16,7 +16,8 @@ SHELL := /bin/bash
 	typecheck typecheck-api typecheck-web \
 	test test-api test-web \
 	migrate migrate-check build-web \
-	check api-check web-check clean
+	dev dev-api dev-web \
+	check api-check web-check clean all
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -68,6 +69,19 @@ migrate: ## Apply all migrations (needs DATABASE_URL)
 migrate-check: ## Apply migrations and assert models match (needs DATABASE_URL)
 	cd api && uv run alembic upgrade head && uv run alembic check
 
+## Dev --------------------------------------------------------------------------
+dev: ## Run API and web dev servers together (Ctrl+C stops both)
+	@trap 'kill 0' EXIT INT TERM; \
+	$(MAKE) dev-api & \
+	$(MAKE) dev-web & \
+	wait
+
+dev-api: ## Run the API dev server
+	cd api && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+dev-web: ## Run the web dev server
+	cd web && npm run dev -- --host --port 5173
+
 ## Build -----------------------------------------------------------------------
 build-web: ## Production build of the web app
 	cd web && npm run build
@@ -82,3 +96,5 @@ web-check: lint-web typecheck-web test-web build-web ## All web validations
 clean: ## Remove caches and build artifacts
 	rm -rf api/.ruff_cache api/.pytest_cache api/.mypy_cache
 	rm -rf web/dist web/node_modules/.vite
+
+all: clean install check ## Clean, install deps, then run the full CI gate (needs DATABASE_URL)
