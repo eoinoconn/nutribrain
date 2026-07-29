@@ -24,6 +24,14 @@ services:
         value: INFO
       - key: SENTRY_DSN
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID  # from Google Cloud Console (docs/features/mcp_oauth.md F-105); leave unset to keep /mcp on APP_TOKEN only
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: MCP_ALLOWED_EMAIL      # the one Google account allowed to authenticate to /mcp
+        sync: false
+      - key: MCP_PUBLIC_BASE_URL     # set after first deploy, once nutrition-api's actual URL is known (must match the Google OAuth client's redirect URI)
+        sync: false
 
   - type: web
     runtime: static
