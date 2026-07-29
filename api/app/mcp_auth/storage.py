@@ -71,8 +71,15 @@ class PostgresKeyValueStore:
         *,
         engine: AsyncEngine | None = None,
     ) -> None:
+        # G6 (docs/decisions.md, mirrored from app/db/engine.py): Neon's free
+        # tier scales to zero and kills idle connections, so this async engine
+        # needs the same pool_pre_ping/pool_recycle guard the sync engine has
+        # — without it, a connection killed by Neon's scale-to-zero hangs
+        # until a TCP-level timeout instead of transparently reconnecting.
         self._engine: AsyncEngine = engine or create_async_engine(
-            database_url or settings.database_url
+            database_url or settings.database_url,
+            pool_pre_ping=True,
+            pool_recycle=300,
         )
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False)
 
