@@ -166,7 +166,14 @@ def _build_mcp_auth_provider() -> GoogleProvider | None:
         client_secret=s.google_oauth_client_secret,
         base_url=s.mcp_public_base_url,
         client_storage=PostgresKeyValueStore(),
-        required_scopes=["openid"],
+        # "email" is required, not optional: Google only includes
+        # email/email_verified in the tokeninfo/userinfo response when that
+        # scope was actually granted — "openid" alone gets you `sub` only.
+        # SingleEmailTokenVerifier (F-102) depends on both claims being
+        # present, so without this scope every login is rejected with
+        # "email_not_verified" regardless of which account signs in
+        # (reproduced live — see docs/features/mcp_oauth.md).
+        required_scopes=["openid", "email"],
     )
     provider._token_validator = SingleEmailTokenVerifier(
         provider._token_validator, s.mcp_allowed_email

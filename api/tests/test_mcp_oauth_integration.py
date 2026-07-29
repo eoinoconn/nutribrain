@@ -111,7 +111,7 @@ async def _issue_fastmcp_access_token(provider: OAuthProxy, *, upstream_access_t
         refresh_token_expires_at=None,
         expires_at=time.time() + 3600,
         token_type="Bearer",
-        scope="openid",
+        scope=" ".join(provider.required_scopes),
         client_id="test-mcp-client",
         created_at=time.time(),
         raw_token_data={},
@@ -120,9 +120,15 @@ async def _issue_fastmcp_access_token(provider: OAuthProxy, *, upstream_access_t
         key=upstream_token_id, value=upstream_token_set, ttl=3600
     )
 
+    # Must match `provider.required_scopes` exactly, not the shorthand scope
+    # names passed to `GoogleProvider(required_scopes=...)` in app.main —
+    # `GoogleTokenVerifier` normalizes shorthands like "email" to their full
+    # URI form (e.g. "https://www.googleapis.com/auth/userinfo.email"), and
+    # `OAuthProxy.required_scopes` (what FastMCP's own middleware checks a
+    # presented token's scopes against) is set from the *normalized* list.
     fastmcp_token = provider.jwt_issuer.issue_access_token(
         client_id="test-mcp-client",
-        scopes=["openid"],
+        scopes=provider.required_scopes,
         jti=access_jti,
         expires_in=3600,
     )
@@ -192,7 +198,11 @@ def _mock_inner_verifier(provider: OAuthProxy, *, email: str, email_verified: bo
         return AccessToken(
             token=token,
             client_id="google-sub",
-            scopes=["openid"],
+            # Must be the normalized scopes (see `_issue_fastmcp_access_token`):
+            # `RequireAuthMiddleware`'s scope check reads `AccessToken.scopes`
+            # from this verifier's return value, not from the FastMCP JWT's
+            # own scopes claim.
+            scopes=provider.required_scopes,
             claims={"email": email, "email_verified": email_verified},
         )
 

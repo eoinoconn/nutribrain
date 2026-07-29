@@ -118,9 +118,14 @@ step away from it).
    For a single-user app this is mostly ceremony, but leaving it on costs
    nothing and is the safer default — recommend keeping it `True` rather
    than special-casing it off.
-3. **Required scopes.** `openid` alone is enough to identify the account
-   (`sub`, `email` come back via tokeninfo/userinfo regardless per the
-   provider's implementation) — recommend not requesting
+3. **Required scopes — RESOLVED, `openid` alone is not enough.** The
+   original recommendation here (`openid` alone, on the assumption `email`
+   comes back via tokeninfo/userinfo regardless of granted scope) was wrong
+   and reproduced live: with `required_scopes=["openid"]`, Google's
+   tokeninfo/userinfo responses came back `200` but omitted a truthy
+   `email_verified` claim, so every login — including the correct account —
+   was rejected with `email_not_verified`. Fixed by requesting
+   `required_scopes=["openid", "email"]`; still not requesting
    `userinfo.profile` since NutriBrain has no use for name/picture.
 
 ---
