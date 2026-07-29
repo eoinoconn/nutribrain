@@ -986,6 +986,10 @@ Establishes backups actually work.
 | `LOG_LEVEL` | api | `INFO` default, `DEBUG` for deep dives |
 | `SENTRY_DSN` | api, web | Optional |
 | `VITE_API_BASE` | web build | API base URL |
+| `GOOGLE_OAUTH_CLIENT_ID` | api | Google OAuth client ID for `/mcp` (optional; see `docs/features/mcp_oauth.md`) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | api | Google OAuth client secret for `/mcp` (optional) |
+| `MCP_ALLOWED_EMAIL` | api | Sole Google account allowed to authenticate to `/mcp` (optional) |
+| `MCP_PUBLIC_BASE_URL` | api | Public base URL for constructing the `/mcp` OAuth redirect (optional) |
 
 ## Appendix B — Enums
 
