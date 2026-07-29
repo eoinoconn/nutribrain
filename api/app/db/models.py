@@ -10,8 +10,10 @@ from __future__ import annotations
 import enum
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -282,3 +284,24 @@ class IntervalsSyncStatus(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class McpOAuthKV(Base):
+    """Backing store for FastMCP's ``GoogleProvider`` ``client_storage`` (F-101).
+
+    ``OAuthProxy`` uses this as a generic ``AsyncKeyValue`` store for OAuth
+    proxy state (registered DCR clients, encrypted upstream tokens,
+    authorization codes, ...), partitioned by ``collection``. Postgres is used
+    instead of the library's default encrypted-file store because Render's
+    filesystem is ephemeral across deploys (see
+    ``docs/features/mcp_oauth.md`` "Motivation").
+    """
+
+    __tablename__ = "mcp_oauth_kv"
+
+    collection: Mapped[str] = mapped_column(Text, primary_key=True)
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # NULL means no expiry. TTL is enforced lazily on read (see
+    # app/mcp_auth/storage.py) rather than by an active sweeper.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
