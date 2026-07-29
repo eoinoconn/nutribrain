@@ -1,3 +1,4 @@
+# Render Blueprint — see https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: nutrition-api
