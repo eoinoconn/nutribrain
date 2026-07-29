@@ -49,7 +49,7 @@ def _validate_startup_settings() -> None:
         "app_token": settings_module.settings.app_token,
         "cors_origin": settings_module.settings.cors_origin,
     }
-    blank = [name for name, value in required_values.items() if not value.strip()]
+    blank = [name for name, value in required_values.items() if not value or not value.strip()]
     if blank:
         fields = ", ".join(sorted(blank))
         raise RuntimeError(
@@ -101,10 +101,10 @@ def create_app(*, include_mcp_mount: bool = True) -> FastAPI:
     # 1. AuthMiddleware — rejects unauthenticated requests
     # 2. CORSMiddleware — handles preflight before auth sees OPTIONS
     # 3. RequestLoggingMiddleware — outermost; binds request_id, logs slow requests
-    app.add_middleware(AuthMiddleware, token=settings_module.settings.app_token)
+    app.add_middleware(AuthMiddleware, token=settings_module.settings.app_token or "")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings_module.settings.cors_origin],
+        allow_origins=[settings_module.settings.cors_origin or ""],
         allow_methods=["*"],
         allow_headers=["*"],
     )
