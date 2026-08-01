@@ -124,7 +124,7 @@ export function MacroBars({
   target: DayResponse["effectiveTarget"];
 }): JSX.Element {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4">
       <MacroBar label="Protein" grams={totals.proteinG} targetGrams={target?.proteinG ?? null} />
       <MacroBar label="Carbs" grams={totals.carbsG} targetGrams={target?.carbsG ?? null} />
       <MacroBar label="Fat" grams={totals.fatG} targetGrams={target?.fatG ?? null} />
@@ -148,6 +148,33 @@ export function MicroRow({ totals }: { totals: ItemMacros }): JSX.Element {
         <dd>{totals.sodiumMg !== null ? `${formatCalories(totals.sodiumMg)} mg` : "—"}</dd>
       </div>
     </dl>
+  );
+}
+
+/**
+ * Composes the calorie ring, macro bars, and micro-stats into the summary
+ * layout used by Day detail/Today (§2 of docs/features/today_ui_redesign.md):
+ * ring on the left, macro bars + micro row stacked in a column to its right,
+ * wrapping to a stacked layout below the `md` breakpoint. Pure layout — the
+ * three pieces it composes already receive and render the data.
+ */
+export function SummaryRow({
+  totals,
+  target
+}: {
+  totals: ItemMacros;
+  target: DayResponse["effectiveTarget"];
+}): JSX.Element {
+  return (
+    <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-10">
+      <div className="shrink-0">
+        <CalorieProgress totals={totals} target={target} />
+      </div>
+      <div className="w-full min-w-0 flex-1 space-y-4">
+        <MacroBars totals={totals} target={target} />
+        <MicroRow totals={totals} />
+      </div>
+    </div>
   );
 }
 

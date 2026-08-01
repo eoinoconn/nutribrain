@@ -39,15 +39,7 @@ import Skeleton from "../design/Skeleton";
 import EmptyState from "../design/EmptyState";
 import type { DayResponse, MealItemRequest, MealType } from "../lib/api/types";
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
-import {
-  CalorieProgress,
-  DayHeader,
-  MEAL_TYPE_LABELS,
-  MEAL_TYPE_ORDER,
-  MacroBars,
-  MicroRow,
-  formatCalories
-} from "../components/DaySummary";
+import { DayHeader, MEAL_TYPE_LABELS, MEAL_TYPE_ORDER, SummaryRow, formatCalories } from "../components/DaySummary";
 import { buildCreateMealRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
 
 /** Best-effort key only; the header's displayed date always comes from the
@@ -356,11 +348,7 @@ export default function DayView(): JSX.Element {
     <section className="space-y-8">
       <DayHeader day={day} title={isToday ? "Today" : "Day detail"} />
 
-      <CalorieProgress totals={day.dayTotals} target={day.effectiveTarget} />
-
-      <MacroBars totals={day.dayTotals} target={day.effectiveTarget} />
-
-      <MicroRow totals={day.dayTotals} />
+      <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
 
       <ManualCaloriesOutForm
         value={manualCaloriesOut}
