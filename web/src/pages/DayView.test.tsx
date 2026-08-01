@@ -313,6 +313,164 @@ describe("DayView", () => {
     expect(await screen.findByText(/item updated/i)).toBeInTheDocument();
   });
 
+  it("shows the target breakdown with calories-out data", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        effectiveTarget: {
+          effectiveFrom: "2026-07-01",
+          baseCalories: 2000,
+          proteinG: 150,
+          carbsG: 200,
+          fatG: 60,
+          caloriesOut: 500,
+          effectiveCalories: 2500
+        }
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText(/target 2,500 \(2,000 base \+ 500 out\)/i)).toBeInTheDocument();
+  });
+
+  it("shows the no-activity-data breakdown when calories-out is absent", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        effectiveTarget: {
+          effectiveFrom: "2026-07-01",
+          baseCalories: 2000,
+          proteinG: 150,
+          carbsG: 200,
+          fatG: 60,
+          caloriesOut: null,
+          effectiveCalories: 2000
+        }
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText(/target 2,000 \(no activity data\)/i)).toBeInTheDocument();
+  });
+
+  it("expands and collapses a meal group", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        meals: {
+          breakfast: [
+            {
+              id: 1,
+              loggedAt: "2026-07-20T08:00:00Z",
+              mealType: "breakfast",
+              notes: null,
+              items: [makeItem()],
+              totals: {
+                calories: 250,
+                proteinG: 40,
+                carbsG: 0,
+                fatG: 8,
+                fiberG: 0,
+                satFatG: 2,
+                sodiumMg: 300
+              }
+            }
+          ]
+        }
+      })
+    );
+    renderPage();
+
+    const toggle = await screen.findByRole("button", { name: /breakfast/i });
+    expect(screen.queryByText("Chicken breast")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByText("Chicken breast")).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText("Chicken breast")).not.toBeInTheDocument();
+  });
+
+  it("shows an error toast and keeps the editor open when logging a meal fails", async () => {
+    mockedGetDay.mockResolvedValue(makeDay());
+    mockedCreateMeal.mockRejectedValue(new Error("failed"));
+    renderPage();
+
+    fireEvent.click((await screen.findAllByRole("button", { name: /log a meal/i }))[0]!);
+    fireEvent.change(screen.getByLabelText(/quantity/i), { target: { value: "150" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /ad-hoc/i }));
+    fireEvent.change(screen.getByLabelText(/name \(item 1\)/i), { target: { value: "Snack bar" } });
+    fireEvent.change(screen.getByLabelText(/^calories$/i), { target: { value: "200" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /save meal/i }));
+
+    expect(await screen.findByText(/could not log meal/i)).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: /meal editor/i })).toBeInTheDocument();
+  });
+
+  it("syncs intervals: calls the endpoint, shows success toast, invalidates day query", async () => {
+    mockedGetDay.mockResolvedValue(makeDay({ date: todayIso() }));
+    mockedSyncIntervals.mockResolvedValue({
+      fromDate: todayIso(),
+      toDate: todayIso(),
+      daysSynced: 1,
+      failures: []
+    });
+    renderPage("/");
+
+    fireEvent.click(await screen.findByRole("button", { name: /sync intervals now/i }));
+
+    await waitFor(() => expect(mockedSyncIntervals).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/synced with intervals/i)).toBeInTheDocument();
+    await waitFor(() => expect(mockedGetDay).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows an error toast when sync fails", async () => {
+    mockedGetDay.mockResolvedValue(makeDay({ date: todayIso() }));
+    mockedSyncIntervals.mockRejectedValue(new Error("nope"));
+    renderPage("/");
+
+    fireEvent.click(await screen.findByRole("button", { name: /sync intervals now/i }));
+
+    expect(await screen.findByText(/sync failed/i)).toBeInTheDocument();
+  });
+
+  it("rejects a negative manual override without calling the API", async () => {
+    mockedGetDay.mockResolvedValue(makeDay());
+    renderPage();
+
+    const input = await screen.findByLabelText(/calories out \(manual\)/i);
+    fireEvent.change(input, { target: { value: "-5" } });
+    fireEvent.click(screen.getByRole("button", { name: /^set$/i }));
+
+    expect(await screen.findByText(/non-negative/i)).toBeInTheDocument();
+    expect(mockedSetManualCaloriesOut).not.toHaveBeenCalled();
+  });
+
+  it("rolls back an optimistic item delete and shows an error toast on failure", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        meals: {
+          breakfast: [
+            {
+              id: 5,
+              loggedAt: "2026-07-20T08:00:00Z",
+              mealType: "breakfast",
+              notes: null,
+              items: [makeItem()],
+              totals: { calories: 250, proteinG: 40, carbsG: 0, fatG: 8, fiberG: 0, satFatG: 2, sodiumMg: 300 }
+            }
+          ]
+        }
+      })
+    );
+    mockedDeleteMealItem.mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /breakfast/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
+
+    expect(await screen.findByText(/could not delete item/i)).toBeInTheDocument();
+    expect(await screen.findByText("Chicken breast")).toBeInTheDocument();
+  });
+
   it("logs a new meal via the shared MealEditor for this date", async () => {
     mockedGetDay.mockResolvedValue(makeDay());
     mockedCreateMeal.mockResolvedValue({
