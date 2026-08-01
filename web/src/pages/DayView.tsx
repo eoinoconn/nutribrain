@@ -23,7 +23,7 @@
  */
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createMeal,
@@ -41,6 +41,7 @@ import type { DayResponse, MealItemRequest, MealType } from "../lib/api/types";
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
 import { DayHeader, MEAL_TYPE_LABELS, MEAL_TYPE_ORDER, SummaryRow, formatCalories } from "../components/DaySummary";
 import { buildCreateMealRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
+import { addDays, dayTitleLabel } from "../lib/dateNav";
 
 /** Best-effort key only; the header's displayed date always comes from the
  * API response's `date` field (docs/style.md), never this. */
@@ -71,6 +72,18 @@ export default function DayView(): JSX.Element {
 
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const navigate = useNavigate();
+
+  // Arrows/date-input never mutate `localDate` in place — they push a new
+  // `/day/:date` route (spec §3: bookmarkable, back/forward works). The
+  // route param then drives the query above on the next render.
+  function handleStepDay(deltaDays: number): void {
+    void navigate(`/day/${addDays(localDate, deltaDays)}`);
+  }
+
+  function handleDateChange(nextDate: string): void {
+    void navigate(`/day/${nextDate}`);
+  }
 
   const dayQuery = useQuery({
     queryKey: queryKeys.day(localDate),
@@ -343,10 +356,17 @@ export default function DayView(): JSX.Element {
   ];
   const hasMeals = orderedMealTypes.some((type) => (day.meals[type]?.length ?? 0) > 0);
   const isToday = day.date === todayLocalDate();
+  const title = dayTitleLabel(day.date, todayLocalDate());
 
   return (
     <section className="space-y-8">
-      <DayHeader day={day} title={isToday ? "Today" : "Day detail"} />
+      <DayHeader
+        day={day}
+        title={title}
+        onPrevDay={() => handleStepDay(-1)}
+        onNextDay={() => handleStepDay(1)}
+        onDateChange={handleDateChange}
+      />
 
       <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
 

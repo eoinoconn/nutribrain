@@ -17,27 +17,95 @@ export function formatGrams(value: number): string {
   return value.toFixed(1);
 }
 
-export function DayHeader({ day, title }: { day: DayResponse; title: string }): JSX.Element {
+/**
+ * Prev arrow / native date input / next arrow, styled per the app's
+ * existing slate/sky Tailwind tokens (only the *structure* — arrows either
+ * side of a native `<input type="date">` — is borrowed from
+ * `nutrition-ui-redesign.html`'s `.date-picker`; its colors are a separate,
+ * later task per §7). All calendar-day arithmetic and the date-string
+ * source of truth live in the caller (`DayView.tsx` + `../lib/dateNav`) —
+ * this component only renders controls and reports raw intent upward.
+ */
+export function DatePicker({
+  date,
+  onPrevDay,
+  onNextDay,
+  onDateChange
+}: {
+  date: string;
+  onPrevDay: () => void;
+  onNextDay: () => void;
+  onDateChange: (nextDate: string) => void;
+}): JSX.Element {
+  return (
+    <div className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 dark:border-slate-700">
+      <button
+        type="button"
+        aria-label="Previous day"
+        onClick={onPrevDay}
+        className="focus-ring rounded-md px-2 py-1 text-lg leading-none text-slate-600 hover:bg-slate-100 hover:text-sky-600 dark:text-slate-400 dark:hover:bg-slate-800"
+      >
+        <span aria-hidden="true">&#8249;</span>
+      </button>
+      <input
+        type="date"
+        aria-label="Select date"
+        value={date}
+        onChange={(event) => {
+          if (event.target.value) {
+            onDateChange(event.target.value);
+          }
+        }}
+        className="focus-ring rounded-md border-0 bg-transparent px-1 py-1 text-sm font-medium text-slate-700 dark:text-slate-300"
+      />
+      <button
+        type="button"
+        aria-label="Next day"
+        onClick={onNextDay}
+        className="focus-ring rounded-md px-2 py-1 text-lg leading-none text-slate-600 hover:bg-slate-100 hover:text-sky-600 dark:text-slate-400 dark:hover:bg-slate-800"
+      >
+        <span aria-hidden="true">&#8250;</span>
+      </button>
+    </div>
+  );
+}
+
+export function DayHeader({
+  day,
+  title,
+  onPrevDay,
+  onNextDay,
+  onDateChange
+}: {
+  day: DayResponse;
+  title: string;
+  onPrevDay: () => void;
+  onNextDay: () => void;
+  onDateChange: (nextDate: string) => void;
+}): JSX.Element {
   const target = day.effectiveTarget;
   return (
-    <header className="space-y-1">
-      <h1 className="text-3xl font-bold tracking-tight">
-        {title} &mdash; {day.date}
-      </h1>
-      {target ? (
-        target.caloriesOut !== null ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
-            {formatCalories(target.caloriesOut)} out)
-          </p>
+    <header className="flex flex-wrap items-center justify-between gap-4">
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold tracking-tight">
+          {title} &mdash; {day.date}
+        </h1>
+        {target ? (
+          target.caloriesOut !== null ? (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
+              {formatCalories(target.caloriesOut)} out)
+            </p>
+          ) : (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              target {formatCalories(target.effectiveCalories)} (no activity data)
+            </p>
+          )
         ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            target {formatCalories(target.effectiveCalories)} (no activity data)
-          </p>
-        )
-      ) : (
-        <p className="text-sm text-slate-600 dark:text-slate-400">No target set.</p>
-      )}
+          <p className="text-sm text-slate-600 dark:text-slate-400">No target set.</p>
+        )}
+      </div>
+      <DatePicker date={day.date} onPrevDay={onPrevDay} onNextDay={onNextDay} onDateChange={onDateChange} />
     </header>
   );
 }

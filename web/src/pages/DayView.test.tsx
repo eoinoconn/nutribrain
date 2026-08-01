@@ -120,13 +120,71 @@ describe("DayView", () => {
       renderPage("/day/2026-07-20");
 
       await waitFor(() => expect(mockedGetDay).toHaveBeenCalledWith("2026-07-20"));
-      expect(await screen.findByRole("heading", { name: /Day detail.*2026-07-20/ })).toBeInTheDocument();
+      // 2026-07-20 is a Monday.
+      expect(await screen.findByRole("heading", { name: /Monday.*2026-07-20/ })).toBeInTheDocument();
     });
 
     it("rejects a malformed date route param without calling the API", async () => {
       renderPage("/day/not-a-date");
       expect(await screen.findByRole("alert")).toHaveTextContent(/isn't a valid date/i);
       expect(mockedGetDay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("date picker", () => {
+    it("steps to the previous day and navigates to /day/:date", async () => {
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-20" }));
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-19" }));
+      renderPage("/day/2026-07-20");
+
+      await screen.findByRole("heading", { name: /2026-07-20/ });
+      fireEvent.click(screen.getByRole("button", { name: /previous day/i }));
+
+      await waitFor(() => expect(mockedGetDay).toHaveBeenCalledWith("2026-07-19"));
+      expect(await screen.findByRole("heading", { name: /2026-07-19/ })).toBeInTheDocument();
+    });
+
+    it("steps to the next day and navigates to /day/:date", async () => {
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-20" }));
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-21" }));
+      renderPage("/day/2026-07-20");
+
+      await screen.findByRole("heading", { name: /2026-07-20/ });
+      fireEvent.click(screen.getByRole("button", { name: /next day/i }));
+
+      await waitFor(() => expect(mockedGetDay).toHaveBeenCalledWith("2026-07-21"));
+      expect(await screen.findByRole("heading", { name: /2026-07-21/ })).toBeInTheDocument();
+    });
+
+    it("rolls over a month boundary correctly when stepping forward", async () => {
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-31" }));
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-08-01" }));
+      renderPage("/day/2026-07-31");
+
+      await screen.findByRole("heading", { name: /2026-07-31/ });
+      fireEvent.click(screen.getByRole("button", { name: /next day/i }));
+
+      await waitFor(() => expect(mockedGetDay).toHaveBeenCalledWith("2026-08-01"));
+    });
+
+    it("jumps to a directly-entered date via the native date input", async () => {
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-20" }));
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-10" }));
+      renderPage("/day/2026-07-20");
+
+      await screen.findByRole("heading", { name: /2026-07-20/ });
+      fireEvent.change(screen.getByLabelText(/select date/i), { target: { value: "2026-07-10" } });
+
+      await waitFor(() => expect(mockedGetDay).toHaveBeenCalledWith("2026-07-10"));
+      expect(await screen.findByRole("heading", { name: /2026-07-10/ })).toBeInTheDocument();
+    });
+
+    it("shows the weekday-name title for a non-today date and \"Today\" for today", async () => {
+      mockedGetDay.mockResolvedValue(makeDay({ date: "2026-07-29" }));
+      renderPage("/day/2026-07-29");
+
+      // 2026-07-29 is a Wednesday.
+      expect(await screen.findByRole("heading", { name: /^Wednesday.*2026-07-29/ })).toBeInTheDocument();
     });
   });
 
