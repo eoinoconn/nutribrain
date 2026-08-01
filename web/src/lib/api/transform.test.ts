@@ -47,6 +47,20 @@ describe("keysToCamel", () => {
       name: "Overnight Oats"
     });
   });
+
+  it("coerces scientific-notation Decimal strings (unrounded read-time macro math can produce these)", () => {
+    const input = {
+      protein_g: "1.428571428571429E-7",
+      sodium_mg: "2.5e+3",
+      quantity: "-1.4285714E-7"
+    };
+
+    expect(keysToCamel(input)).toEqual({
+      proteinG: 1.428571428571429e-7,
+      sodiumMg: 2500,
+      quantity: -1.4285714e-7
+    });
+  });
 });
 
 describe("keysToSnake", () => {

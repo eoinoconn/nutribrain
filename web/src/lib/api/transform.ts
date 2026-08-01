@@ -16,11 +16,19 @@
  * unchanged. `keysToSnake` (outgoing requests) does no coercion — request
  * bodies are already built from real JS numbers, and Pydantic accepts a
  * bare JSON number for a `Decimal` field.
+ *
+ * The pattern also matches scientific notation (e.g. `"1.4285714E-7"`).
+ * Since docs/style.md forbids rounding during domain computation, unrounded
+ * read-time macro math (a quantity divided by a large serving size, say)
+ * can produce a Decimal small enough that Python's `Decimal.__str__()`
+ * switches to scientific notation. `Number()` parses that natively; without
+ * matching it here, the value would pass through as an uncoerced string and
+ * crash the first `.toFixed()` call downstream.
  */
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
-const DECIMAL_STRING = /^-?\d+(\.\d+)?$/;
+const DECIMAL_STRING = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 
 function snakeToCamel(key: string): string {
   return key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase());
