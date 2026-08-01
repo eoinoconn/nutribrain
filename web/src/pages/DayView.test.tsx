@@ -530,7 +530,7 @@ describe("DayView", () => {
   });
 
   describe("Log macros (quick ad-hoc entry)", () => {
-    it("opens independently of the meal editor panel", async () => {
+    it("is mutually exclusive with the meal editor panel — opening one closes the other", async () => {
       mockedGetDay.mockResolvedValue(makeDay());
       renderPage();
 
@@ -543,8 +543,13 @@ describe("DayView", () => {
 
       fireEvent.click(mealButton);
       expect(screen.getByRole("form", { name: /^meal editor$/i })).toBeInTheDocument();
-      // Opening the meal editor doesn't close the macros panel or vice versa.
+      // Opening the meal editor closes the macros panel.
+      expect(screen.queryByRole("form", { name: /log macros/i })).not.toBeInTheDocument();
+
+      fireEvent.click(macroButton);
       expect(screen.getByRole("form", { name: /log macros/i })).toBeInTheDocument();
+      // Opening the macros panel closes the meal editor.
+      expect(screen.queryByRole("form", { name: /^meal editor$/i })).not.toBeInTheDocument();
     });
 
     it("defaults meal_type=snack and logged_at=now, and submits a single ad-hoc item via createMeal", async () => {

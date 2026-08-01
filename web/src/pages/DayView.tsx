@@ -285,7 +285,13 @@ export default function DayView(): JSX.Element {
   });
 
   function handleToggleEditor(): void {
-    setIsEditorOpen((open) => !open);
+    setIsEditorOpen((open) => {
+      const next = !open;
+      if (next) {
+        setIsQuickMacroOpen(false);
+      }
+      return next;
+    });
   }
 
   function handleSubmitMeal(): void {
@@ -301,7 +307,13 @@ export default function DayView(): JSX.Element {
   }
 
   function handleToggleQuickMacro(): void {
-    setIsQuickMacroOpen((open) => !open);
+    setIsQuickMacroOpen((open) => {
+      const next = !open;
+      if (next) {
+        setIsEditorOpen(false);
+      }
+      return next;
+    });
   }
 
   function handleSubmitQuickMacro(): void {
