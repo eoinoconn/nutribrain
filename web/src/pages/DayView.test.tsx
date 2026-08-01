@@ -251,6 +251,11 @@ describe("DayView", () => {
     });
     renderPage();
 
+    const toggle = await screen.findByRole("button", { name: /calories out/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
     const input = await screen.findByLabelText(/calories out \(manual\)/i);
     expect(input).toHaveValue(300);
 
@@ -630,10 +635,19 @@ describe("DayView", () => {
     expect(await screen.findByText(/sync failed/i)).toBeInTheDocument();
   });
 
+  it("keeps the calories-out override panel collapsed by default and hides its form", async () => {
+    mockedGetDay.mockResolvedValue(makeDay());
+    renderPage();
+
+    await screen.findByRole("button", { name: /calories out/i });
+    expect(screen.queryByLabelText(/calories out \(manual\)/i)).not.toBeInTheDocument();
+  });
+
   it("rejects a negative manual override without calling the API", async () => {
     mockedGetDay.mockResolvedValue(makeDay());
     renderPage();
 
+    fireEvent.click(await screen.findByRole("button", { name: /calories out/i }));
     const input = await screen.findByLabelText(/calories out \(manual\)/i);
     fireEvent.change(input, { target: { value: "-5" } });
     fireEvent.click(screen.getByRole("button", { name: /^set$/i }));

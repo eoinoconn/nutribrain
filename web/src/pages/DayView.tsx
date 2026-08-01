@@ -103,6 +103,10 @@ export default function DayView(): JSX.Element {
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingItemValue, setEditingItemValue] = useState<MealEditorItem | null>(null);
   const [manualCaloriesOut, setManualCaloriesOutInput] = useState<string>("");
+  // Independent of the editor/quick-macro panels above — it's a distinct
+  // kind of action (an occasional override, not another meal-entry path),
+  // so opening it doesn't close, and isn't closed by, either of those.
+  const [isCaloriesOutOpen, setIsCaloriesOutOpen] = useState(false);
 
   // Prefill the override input with whatever calories-out already applies to
   // this day so re-opening the page shows the current value, not a blank
@@ -306,6 +310,10 @@ export default function DayView(): JSX.Element {
     logMealMutation.mutate(request);
   }
 
+  function handleToggleCaloriesOut(): void {
+    setIsCaloriesOutOpen((open) => !open);
+  }
+
   function handleToggleQuickMacro(): void {
     setIsQuickMacroOpen((open) => {
       const next = !open;
@@ -428,17 +436,33 @@ export default function DayView(): JSX.Element {
         onPrevDay={() => handleStepDay(-1)}
         onNextDay={() => handleStepDay(1)}
         onDateChange={handleDateChange}
+        caloriesOutToggle={
+          <button
+            type="button"
+            onClick={handleToggleCaloriesOut}
+            aria-expanded={isCaloriesOutOpen}
+            aria-controls="calories-out-panel"
+            className="focus-ring shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {isCaloriesOutOpen ? "Close" : "Calories out"}
+          </button>
+        }
+        caloriesOutPanel={
+          isCaloriesOutOpen ? (
+            <div id="calories-out-panel">
+              <ManualCaloriesOutForm
+                value={manualCaloriesOut}
+                onChange={setManualCaloriesOutInput}
+                onSubmit={handleSubmitOverride}
+                isPending={manualOverrideMutation.isPending}
+                currentCaloriesOut={day.effectiveTarget?.caloriesOut ?? null}
+              />
+            </div>
+          ) : null
+        }
       />
 
       <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
-
-      <ManualCaloriesOutForm
-        value={manualCaloriesOut}
-        onChange={setManualCaloriesOutInput}
-        onSubmit={handleSubmitOverride}
-        isPending={manualOverrideMutation.isPending}
-        currentCaloriesOut={day.effectiveTarget?.caloriesOut ?? null}
-      />
 
       <div className="flex flex-wrap gap-3">
         <button

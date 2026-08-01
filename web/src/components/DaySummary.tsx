@@ -7,6 +7,7 @@
  * target math happens here, per CLAUDE.md).
  */
 
+import type { ReactNode } from "react";
 import type { DayResponse, ItemMacros, MealType } from "../lib/api/types";
 
 export function formatCalories(value: number): string {
@@ -75,37 +76,55 @@ export function DayHeader({
   title,
   onPrevDay,
   onNextDay,
-  onDateChange
+  onDateChange,
+  caloriesOutToggle,
+  caloriesOutPanel
 }: {
   day: DayResponse;
   title: string;
   onPrevDay: () => void;
   onNextDay: () => void;
   onDateChange: (nextDate: string) => void;
+  /** Compact toggle button rendered directly to the left of `DatePicker` in
+   * the header row (docs/features/today_ui_redesign.md backlog: the manual
+   * calories-out override moved out of the page body into the header). Owned
+   * and composed by the caller (`DayView.tsx`) — this component stays
+   * presentational and only positions it. */
+  caloriesOutToggle?: ReactNode;
+  /** The collapsible override form itself, rendered as a full-width block
+   * below the header row when open — same "toggle row, panel underneath"
+   * shape as the other panels in `DayView.tsx`. */
+  caloriesOutPanel?: ReactNode;
 }): JSX.Element {
   const target = day.effectiveTarget;
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">
-          {title} &mdash; {day.date}
-        </h1>
-        {target ? (
-          target.caloriesOut !== null ? (
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
-              {formatCalories(target.caloriesOut)} out)
-            </p>
+    <header className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">
+            {title} &mdash; {day.date}
+          </h1>
+          {target ? (
+            target.caloriesOut !== null ? (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
+                {formatCalories(target.caloriesOut)} out)
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                target {formatCalories(target.effectiveCalories)} (no activity data)
+              </p>
+            )
           ) : (
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              target {formatCalories(target.effectiveCalories)} (no activity data)
-            </p>
-          )
-        ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-400">No target set.</p>
-        )}
+            <p className="text-sm text-slate-600 dark:text-slate-400">No target set.</p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {caloriesOutToggle}
+          <DatePicker date={day.date} onPrevDay={onPrevDay} onNextDay={onNextDay} onDateChange={onDateChange} />
+        </div>
       </div>
-      <DatePicker date={day.date} onPrevDay={onPrevDay} onNextDay={onNextDay} onDateChange={onDateChange} />
+      {caloriesOutPanel}
     </header>
   );
 }
