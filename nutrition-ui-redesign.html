@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nutrition Tracker — Redesign Wireframe</title>
+<style>
+  :root{
+    --bg: #1c1c1e;
+    --bg-panel: #262628;
+    --bg-panel-2: #2e2e30;
+    --border: #3a3a3c;
+    --text: #f2f0ed;
+    --text-dim: #a8a6a2;
+    --text-faint: #787672;
+    --accent: #ff8a3d;
+    --accent-dim: #ff8a3d33;
+    --track: #3a3a3c;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display:flex;
+    min-height:100vh;
+  }
+
+  /* SIDEBAR */
+  nav.sidebar{
+    width: 200px;
+    flex-shrink:0;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    display:flex;
+    flex-direction:column;
+    gap: 2px;
+    transition: width 0.18s ease;
+  }
+  nav.sidebar.collapsed{ width: 60px; }
+
+  .sidebar-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 0 14px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  nav.sidebar .brand{
+    font-weight:700;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+    white-space:nowrap;
+    overflow:hidden;
+  }
+  nav.sidebar.collapsed .brand{ display:none; }
+  nav.sidebar.collapsed .sidebar-head{
+    justify-content:center;
+    padding: 0 0 20px;
+  }
+  .collapse-btn{
+    background:none;
+    border:none;
+    color: var(--text-faint);
+    cursor:pointer;
+    font-size: 16px;
+    line-height:1;
+    padding: 4px;
+  }
+  .collapse-btn:hover{ color: var(--accent); }
+
+  nav.sidebar a{
+    color: var(--text-dim);
+    text-decoration:none;
+    padding: 10px 20px;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    white-space:nowrap;
+    overflow:hidden;
+  }
+  nav.sidebar a .nav-icon{
+    flex-shrink:0;
+    width: 18px;
+    text-align:center;
+    font-size: 15px;
+  }
+  nav.sidebar.collapsed a{
+    padding: 10px 0;
+    justify-content:center;
+    border-left-width: 0;
+    border-right: 3px solid transparent;
+  }
+  nav.sidebar.collapsed a .nav-label{ display:none; }
+  nav.sidebar.collapsed a.active{ border-right-color: var(--accent); }
+  nav.sidebar a.active{
+    color: var(--text);
+    background: var(--bg-panel-2);
+    border-left-color: var(--accent);
+    font-weight:600;
+  }
+  nav.sidebar a:hover:not(.active){
+    color: var(--text);
+  }
+
+  /* MAIN */
+  main{
+    flex:1;
+    padding: 32px 40px;
+    max-width: 1100px;
+  }
+  header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  header h1{
+    margin:0;
+    font-size: 30px;
+    font-weight: 800;
+  }
+  header p{
+    margin: 6px 0 28px;
+    color: var(--text-faint);
+    font-size: 14px;
+  }
+  .date-picker{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    flex-shrink:0;
+  }
+  .date-picker button{
+    background:none;
+    border:none;
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor:pointer;
+    padding: 2px 4px;
+    line-height:1;
+  }
+  .date-picker button:hover{ color: var(--accent); }
+  .date-picker input[type="date"]{
+    background:none;
+    border:none;
+    color: var(--text);
+    font-size: 14px;
+    font-weight:600;
+    font-family: inherit;
+    color-scheme: dark;
+  }
+
+  /* SUMMARY ROW: ring left, macros right */
+  .summary-row{
+    display:flex;
+    align-items:center;
+    gap: 40px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .ring-wrap{
+    flex-shrink:0;
+    text-align:center;
+  }
+  .ring-wrap .cal-label{
+    margin-top: 10px;
+    font-weight:700;
+    font-size: 15px;
+  }
+  .macros-col{
+    flex:1;
+    min-width: 260px;
+    display:flex;
+    flex-direction:column;
+    gap: 16px;
+  }
+  .macro-row .macro-top{
+    display:flex;
+    justify-content:space-between;
+    font-size: 13px;
+    margin-bottom:6px;
+  }
+  .macro-row .macro-top span:first-child{ font-weight:700; }
+  .macro-row .macro-top span:last-child{ color: var(--text-dim); }
+  .bar-track{
+    height: 8px;
+    background: var(--track);
+    border-radius: 5px;
+    overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    background: var(--accent);
+    border-radius: 5px;
+  }
+  .micro-row{
+    display:flex;
+    gap: 24px;
+    color: var(--text-faint);
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* ACTIONS */
+  .actions{
+    display:flex;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .btn{
+    border:none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .btn-primary{ background: var(--accent); color: #1c1c1e; }
+  .btn-outline{ background:transparent; border:1px solid var(--border); color: var(--text); }
+
+  /* MEAL LOG - chronological, macros inline */
+  .section-label{
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+  }
+  .meal-list{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+  }
+  .meal-card{
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 20px;
+    cursor: pointer;
+  }
+  .meal-card:hover{ border-color: #55524c; }
+  .chevron{
+    color: var(--text-faint);
+    font-size: 12px;
+    transition: transform 0.15s ease;
+    flex-shrink:0;
+  }
+  .meal-wrap.open .chevron{ transform: rotate(90deg); color: var(--accent); }
+  .meal-wrap.open .meal-card{ border-color: var(--accent); }
+  .meal-detail{
+    display:none;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    margin-top: -10px;
+    padding: 6px 18px 12px;
+  }
+  .meal-wrap.open .meal-detail{ display:block; }
+  .food-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .food-row:first-child{ border-top:none; }
+  .food-name{ color: var(--text); }
+  .food-qty{ color: var(--text-faint); font-size: 12px; margin-left: 8px; }
+  .food-macros{
+    display:flex;
+    gap: 14px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .food-macros span b{ color: var(--text); }
+  .food-cal{ font-weight:700; color: var(--accent); min-width: 56px; text-align:right; }
+  .meal-left{
+    display:flex;
+    flex-direction:column;
+    gap: 2px;
+    min-width: 140px;
+  }
+  .meal-time{ color: var(--text-faint); font-size: 11px; }
+  .meal-name{ font-weight:700; font-size: 15px; }
+  .meal-cal{
+    font-weight:700;
+    color: var(--accent);
+    font-size: 14px;
+    min-width: 64px;
+  }
+  .meal-macros{
+    display:flex;
+    gap: 18px;
+    color: var(--text-dim);
+    font-size: 12px;
+    flex:1;
+    justify-content:flex-end;
+  }
+  .meal-macros span b{ color: var(--text); }
+
+  @media (max-width: 720px){
+    body{ flex-direction:column; }
+    nav.sidebar{ width:100%; flex-direction:row; overflow-x:auto; padding:12px; }
+    nav.sidebar .brand{ display:none; }
+    nav.sidebar a{ border-left:none; border-bottom:3px solid transparent; white-space:nowrap; }
+    nav.sidebar a.active{ border-bottom-color: var(--accent); }
+    .meal-card{ flex-wrap:wrap; }
+    .meal-macros{ justify-content:flex-start; width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <span class="brand">NUTRIBRAIN</span>
+    <button class="collapse-btn" id="collapseBtn" title="Collapse sidebar">&#9776;</button>
+  </div>
+  <a class="active" href="#" title="Today"><span class="nav-icon">&#9673;</span><span class="nav-label">Today</span></a>
+  <a href="#" title="Trends"><span class="nav-icon">&#9650;</span><span class="nav-label">Trends</span></a>
+  <a href="#" title="Calendar"><span class="nav-icon">&#9635;</span><span class="nav-label">Calendar</span></a>
+  <a href="#" title="Foods"><span class="nav-icon">&#9679;</span><span class="nav-label">Foods</span></a>
+  <a href="#" title="Templates"><span class="nav-icon">&#9634;</span><span class="nav-label">Templates</span></a>
+  <a href="#" title="Targets"><span class="nav-icon">&#9678;</span><span class="nav-label">Targets</span></a>
+  <a href="#" title="Settings"><span class="nav-icon">&#9881;</span><span class="nav-label">Settings</span></a>
+</nav>
+
+<main>
+  <header>
+    <div>
+      <h1>Today — 2026-07-29</h1>
+      <p>target 3,422 (2,300 base + 1,122 out)</p>
+    </div>
+    <div class="date-picker">
+      <button title="Previous day">&#8249;</button>
+      <input type="date" value="2026-07-29">
+      <button title="Next day">&#8250;</button>
+    </div>
+  </header>
+
+  <div class="summary-row">
+    <div class="ring-wrap">
+      <svg width="170" height="170" viewBox="0 0 170 170">
+        <circle cx="85" cy="85" r="72" fill="none" stroke="#3a3a3c" stroke-width="14"/>
+        <circle cx="85" cy="85" r="72" fill="none" stroke="#ff8a3d" stroke-width="14"
+          stroke-dasharray="452" stroke-dashoffset="60" stroke-linecap="round"
+          transform="rotate(-90 85 85)"/>
+      </svg>
+      <div class="cal-label">3,070 / 3,422 cal</div>
+    </div>
+
+    <div class="macros-col">
+      <div class="macro-row">
+        <div class="macro-top"><span>Protein</span><span>168.8 / 160.0 g</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="macro-row">
+        <div class="macro-top"><span>Carbs</span><span>367.7 / 300.0 g</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="macro-row">
+        <div class="macro-top"><span>Fat</span><span>105.2 / 90.0 g</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="micro-row">
+        <span>Fiber 15.8 g</span>
+        <span>Sat fat 24.3 g</span>
+        <span>Sodium 4,499 mg</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary">Log a meal</button>
+    <button class="btn btn-outline">Log macros</button>
+    <button class="btn btn-outline">Sync intervals now</button>
+  </div>
+
+  <p class="section-label">Logged today, in order</p>
+  <div class="meal-list">
+    <div class="meal-wrap">
+      <div class="meal-card" onclick="this.parentElement.classList.toggle('open')">
+        <div class="meal-left">
+          <span class="meal-time">7:10 AM</span>
+          <span class="meal-name">Snack</span>
+        </div>
+        <div class="meal-cal">210 cal</div>
+        <div class="meal-macros">
+          <span>P <b>14g</b></span>
+          <span>C <b>18g</b></span>
+          <span>F <b>9g</b></span>
+        </div>
+        <span class="chevron">&#9656;</span>
+      </div>
+      <div class="meal-detail">
+        <div class="food-row">
+          <div><span class="food-name">Greek yogurt</span><span class="food-qty">170 g</span></div>
+          <div class="food-macros"><span>P <b>17g</b></span><span>C <b>8g</b></span><span>F <b>4g</b></span></div>
+          <div class="food-cal">120 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Blueberries</span><span class="food-qty">80 g</span></div>
+          <div class="food-macros"><span>P <b>1g</b></span><span>C <b>10g</b></span><span>F <b>0g</b></span></div>
+          <div class="food-cal">45 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Honey</span><span class="food-qty">1 tbsp</span></div>
+          <div class="food-macros"><span>P <b>0g</b></span><span>C <b>17g</b></span><span>F <b>0g</b></span></div>
+          <div class="food-cal">64 cal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="meal-wrap">
+      <div class="meal-card" onclick="this.parentElement.classList.toggle('open')">
+        <div class="meal-left">
+          <span class="meal-time">8:20 AM</span>
+          <span class="meal-name">Breakfast</span>
+        </div>
+        <div class="meal-cal">577 cal</div>
+        <div class="meal-macros">
+          <span>P <b>32g</b></span>
+          <span>C <b>61g</b></span>
+          <span>F <b>19g</b></span>
+        </div>
+        <span class="chevron">&#9656;</span>
+      </div>
+      <div class="meal-detail">
+        <div class="food-row">
+          <div><span class="food-name">Oats</span><span class="food-qty">80 g</span></div>
+          <div class="food-macros"><span>P <b>12g</b></span><span>C <b>48g</b></span><span>F <b>6g</b></span></div>
+          <div class="food-cal">290 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Whole milk</span><span class="food-qty">250 ml</span></div>
+          <div class="food-macros"><span>P <b>8g</b></span><span>C <b>12g</b></span><span>F <b>8g</b></span></div>
+          <div class="food-cal">150 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Banana</span><span class="food-qty">1 medium</span></div>
+          <div class="food-macros"><span>P <b>1g</b></span><span>C <b>27g</b></span><span>F <b>0g</b></span></div>
+          <div class="food-cal">105 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Peanut butter</span><span class="food-qty">1 tbsp</span></div>
+          <div class="food-macros"><span>P <b>4g</b></span><span>C <b>3g</b></span><span>F <b>8g</b></span></div>
+          <div class="food-cal">95 cal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="meal-wrap">
+      <div class="meal-card" onclick="this.parentElement.classList.toggle('open')">
+        <div class="meal-left">
+          <span class="meal-time">1:05 PM</span>
+          <span class="meal-name">Lunch</span>
+        </div>
+        <div class="meal-cal">668 cal</div>
+        <div class="meal-macros">
+          <span>P <b>48g</b></span>
+          <span>C <b>70g</b></span>
+          <span>F <b>22g</b></span>
+        </div>
+        <span class="chevron">&#9656;</span>
+      </div>
+      <div class="meal-detail">
+        <div class="food-row">
+          <div><span class="food-name">Grilled chicken breast</span><span class="food-qty">180 g</span></div>
+          <div class="food-macros"><span>P <b>40g</b></span><span>C <b>0g</b></span><span>F <b>6g</b></span></div>
+          <div class="food-cal">260 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Rice</span><span class="food-qty">200 g cooked</span></div>
+          <div class="food-macros"><span>P <b>4g</b></span><span>C <b>44g</b></span><span>F <b>1g</b></span></div>
+          <div class="food-cal">205 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Mixed vegetables</span><span class="food-qty">150 g</span></div>
+          <div class="food-macros"><span>P <b>3g</b></span><span>C <b>14g</b></span><span>F <b>1g</b></span></div>
+          <div class="food-cal">70 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Olive oil</span><span class="food-qty">1 tbsp</span></div>
+          <div class="food-macros"><span>P <b>0g</b></span><span>C <b>0g</b></span><span>F <b>14g</b></span></div>
+          <div class="food-cal">120 cal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="meal-wrap">
+      <div class="meal-card" onclick="this.parentElement.classList.toggle('open')">
+        <div class="meal-left">
+          <span class="meal-time">4:30 PM</span>
+          <span class="meal-name">Snack</span>
+        </div>
+        <div class="meal-cal">180 cal</div>
+        <div class="meal-macros">
+          <span>P <b>6g</b></span>
+          <span>C <b>22g</b></span>
+          <span>F <b>7g</b></span>
+        </div>
+        <span class="chevron">&#9656;</span>
+      </div>
+      <div class="meal-detail">
+        <div class="food-row">
+          <div><span class="food-name">Apple</span><span class="food-qty">1 medium</span></div>
+          <div class="food-macros"><span>P <b>0g</b></span><span>C <b>19g</b></span><span>F <b>0g</b></span></div>
+          <div class="food-cal">80 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Almonds</span><span class="food-qty">15 g</span></div>
+          <div class="food-macros"><span>P <b>6g</b></span><span>C <b>3g</b></span><span>F <b>7g</b></span></div>
+          <div class="food-cal">100 cal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="meal-wrap">
+      <div class="meal-card" onclick="this.parentElement.classList.toggle('open')">
+        <div class="meal-left">
+          <span class="meal-time">6:40 PM</span>
+          <span class="meal-name">Dinner</span>
+        </div>
+        <div class="meal-cal">850 cal</div>
+        <div class="meal-macros">
+          <span>P <b>55g</b></span>
+          <span>C <b>90g</b></span>
+          <span>F <b>28g</b></span>
+        </div>
+        <span class="chevron">&#9656;</span>
+      </div>
+      <div class="meal-detail">
+        <div class="food-row">
+          <div><span class="food-name">Salmon fillet</span><span class="food-qty">200 g</span></div>
+          <div class="food-macros"><span>P <b>44g</b></span><span>C <b>0g</b></span><span>F <b>18g</b></span></div>
+          <div class="food-cal">370 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Sweet potato</span><span class="food-qty">250 g</span></div>
+          <div class="food-macros"><span>P <b>4g</b></span><span>C <b>58g</b></span><span>F <b>0g</b></span></div>
+          <div class="food-cal">215 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Green salad + dressing</span><span class="food-qty">1 bowl</span></div>
+          <div class="food-macros"><span>P <b>2g</b></span><span>C <b>10g</b></span><span>F <b>8g</b></span></div>
+          <div class="food-cal">140 cal</div>
+        </div>
+        <div class="food-row">
+          <div><span class="food-name">Butter</span><span class="food-qty">1 pat</span></div>
+          <div class="food-macros"><span>P <b>0g</b></span><span>C <b>0g</b></span><span>F <b>4g</b></span></div>
+          <div class="food-cal">35 cal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  (function(){
+    var sidebar = document.getElementById('sidebar');
+    var btn = document.getElementById('collapseBtn');
+    try {
+      if (localStorage.getItem('sidebarCollapsed') === '1') {
+        sidebar.classList.add('collapsed');
+      }
+    } catch (e) {}
+    btn.addEventListener('click', function(){
+      sidebar.classList.toggle('collapsed');
+      var isCollapsed = sidebar.classList.contains('collapsed');
+      btn.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      try { localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0'); } catch (e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>
