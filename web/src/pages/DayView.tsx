@@ -37,10 +37,10 @@ import { queryKeys } from "../lib/queryClient";
 import { useToast } from "../design/useToast";
 import Skeleton from "../design/Skeleton";
 import EmptyState from "../design/EmptyState";
-import type { DayResponse, MealItemRequest, MealType } from "../lib/api/types";
+import type { DayMealGroup, DayResponse, MealItemRequest, MealType } from "../lib/api/types";
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
 import { QuickMacroEntry, type QuickMacroValue } from "../components/QuickMacroEntry";
-import { DayHeader, MEAL_TYPE_LABELS, MEAL_TYPE_ORDER, SummaryRow, formatCalories } from "../components/DaySummary";
+import { DayHeader, MEAL_TYPE_LABELS, SummaryRow, formatCalories, formatGrams } from "../components/DaySummary";
 import { buildCreateMealRequest, buildQuickMacroRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
 import { addDays, dayTitleLabel } from "../lib/dateNav";
 
@@ -99,7 +99,7 @@ export default function DayView(): JSX.Element {
   // on its own, per §4 of docs/features/today_ui_redesign.md.
   const [isQuickMacroOpen, setIsQuickMacroOpen] = useState(false);
   const [quickMacroValue, setQuickMacroValue] = useState<QuickMacroValue | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingItemValue, setEditingItemValue] = useState<MealEditorItem | null>(null);
   const [manualCaloriesOut, setManualCaloriesOutInput] = useState<string>("");
@@ -328,8 +328,12 @@ export default function DayView(): JSX.Element {
     logMacrosMutation.mutate(request);
   }
 
-  function toggleGroup(key: string): void {
-    setExpanded((current) => ({ ...current, [key]: !current[key] }));
+  // The row toggle below is a native `<button>`, so Enter/Space already
+  // activate it via the browser's default keyboard handling — no extra
+  // `onKeyDown` wiring needed (same pattern as the editor/quick-macro
+  // toggle buttons above).
+  function toggleGroup(mealId: number): void {
+    setExpanded((current) => ({ ...current, [mealId]: !current[mealId] }));
   }
 
   function handleStartEditItem(itemId: number, current: MealEditorItem): void {
@@ -406,12 +410,13 @@ export default function DayView(): JSX.Element {
   }
 
   const day = dayQuery.data;
-  const mealTypeKeys = Object.keys(day.meals) as MealType[];
-  const orderedMealTypes = [
-    ...MEAL_TYPE_ORDER.filter((type) => mealTypeKeys.includes(type)),
-    ...mealTypeKeys.filter((type) => !MEAL_TYPE_ORDER.includes(type))
-  ];
-  const hasMeals = orderedMealTypes.some((type) => (day.meals[type]?.length ?? 0) > 0);
+  // §5: one flat, chronological list of meal *instances* (each
+  // `DayMealGroup`), not grouped under meal-type section headers. Multiple
+  // entries of the same meal type (e.g. two snacks) each get their own row.
+  const flatMealGroups = (Object.entries(day.meals) as [MealType, DayMealGroup[]][])
+    .flatMap(([mealType, groups]) => (groups ?? []).map((group) => ({ mealType, group })))
+    .sort((a, b) => new Date(a.group.loggedAt).getTime() - new Date(b.group.loggedAt).getTime());
+  const hasMeals = flatMealGroups.length > 0;
   const isToday = day.date === todayLocalDate();
   const title = dayTitleLabel(day.date, todayLocalDate());
 
@@ -494,102 +499,121 @@ export default function DayView(): JSX.Element {
 
       {hasMeals ? (
         <div className="space-y-3">
-          {orderedMealTypes.map((mealType) => {
-            const groups = day.meals[mealType] ?? [];
-            if (groups.length === 0) {
-              return null;
-            }
-            const isOpen = expanded[mealType] ?? false;
+          {flatMealGroups.map(({ mealType, group }) => {
+            const isOpen = expanded[group.id] ?? false;
             return (
-              <div key={mealType} className="rounded-lg border border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(mealType)}
-                  aria-expanded={isOpen}
-                  className="focus-ring flex w-full items-center justify-between px-4 py-3 text-left font-medium"
-                >
-                  <span>{MEAL_TYPE_LABELS[mealType] ?? mealType}</span>
-                  <span className="text-sm text-slate-500 dark:text-slate-400">
-                    {formatCalories(groups.reduce((sum, g) => sum + g.totals.calories, 0))} cal
-                  </span>
-                </button>
+              <div key={group.id} className="rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    aria-expanded={isOpen}
+                    className="focus-ring flex flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-left"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-500">
+                        {new Date(group.loggedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="font-medium">{MEAL_TYPE_LABELS[mealType] ?? mealType}</span>
+                    </span>
+                    <span className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {formatCalories(group.totals.calories)} cal
+                      </span>
+                      <span>P {formatGrams(group.totals.proteinG)}g</span>
+                      <span>C {formatGrams(group.totals.carbsG)}g</span>
+                      <span>F {formatGrams(group.totals.fatG)}g</span>
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block transition-transform ${isOpen ? "rotate-90 text-sky-600" : "text-slate-400"}`}
+                      >
+                        &#8250;
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteMealMutation.mutate(group.id)}
+                    disabled={deleteMealMutation.isPending}
+                    className="focus-ring shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Delete meal
+                  </button>
+                </div>
                 {isOpen ? (
-                  <div className="space-y-4 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-                    {groups.map((group) => (
-                      <div key={group.id} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-500">
-                            {new Date(group.loggedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => deleteMealMutation.mutate(group.id)}
-                            disabled={deleteMealMutation.isPending}
-                            className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                          >
-                            Delete meal
-                          </button>
-                        </div>
-                        <ul className="space-y-2 text-sm">
-                          {group.items.map((item) => (
-                            <li key={item.id} className="space-y-2">
-                              {editingItemId === item.id && editingItemValue ? (
-                                <div className="space-y-2 rounded-md border border-sky-300 p-3 dark:border-sky-700">
-                                  <MealItemRow
-                                    item={editingItemValue}
-                                    index={0}
-                                    canRemove={false}
-                                    onChange={setEditingItemValue}
-                                    onRemove={() => undefined}
-                                  />
-                                  <div className="flex gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveEditItem(mealType, group.loggedAt)}
-                                      disabled={editMealItemMutation.isPending}
-                                      className="focus-ring rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
-                                    >
-                                      {editMealItemMutation.isPending ? "Saving..." : "Save item"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleCancelEditItem}
-                                      className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-between gap-4">
-                                  <span>{item.name}</span>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-slate-500 dark:text-slate-400">
-                                      {formatCalories(item.macros.calories)} cal
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStartEditItem(item.id, mealItemToEditorItem(item))}
-                                      className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteMealItemMutation.mutate(item.id)}
-                                      disabled={deleteMealItemMutation.isPending}
-                                      className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
+                  <div className="space-y-2 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                    <ul className="space-y-2 text-sm">
+                      {group.items.map((item) => (
+                        <li key={item.id} className="space-y-2">
+                          {editingItemId === item.id && editingItemValue ? (
+                            <div className="space-y-2 rounded-md border border-sky-300 p-3 dark:border-sky-700">
+                              <MealItemRow
+                                item={editingItemValue}
+                                index={0}
+                                canRemove={false}
+                                onChange={setEditingItemValue}
+                                onRemove={() => undefined}
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditItem(mealType, group.loggedAt)}
+                                  disabled={editMealItemMutation.isPending}
+                                  className="focus-ring rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                                >
+                                  {editMealItemMutation.isPending ? "Saving..." : "Save item"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditItem}
+                                  className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                              <span className="flex items-baseline gap-2">
+                                <span>{item.name}</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                  {formatGrams(item.quantity)} {item.quantityUnit}
+                                </span>
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                  P {formatGrams(item.macros.proteinG)}g
+                                </span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                  C {formatGrams(item.macros.carbsG)}g
+                                </span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                  F {formatGrams(item.macros.fatG)}g
+                                </span>
+                                <span className="text-slate-500 dark:text-slate-400">
+                                  {formatCalories(item.macros.calories)} cal
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditItem(item.id, mealItemToEditorItem(item))}
+                                  className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteMealItemMutation.mutate(item.id)}
+                                  disabled={deleteMealItemMutation.isPending}
+                                  className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
               </div>

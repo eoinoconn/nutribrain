@@ -437,13 +437,153 @@ describe("DayView", () => {
     renderPage();
 
     const toggle = await screen.findByRole("button", { name: /breakfast/i });
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Chicken breast")).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Chicken breast")).toBeInTheDocument();
 
     fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Chicken breast")).not.toBeInTheDocument();
+  });
+
+  it("lists meal instances chronologically by loggedAt, flattened across meal types (not grouped by type)", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        meals: {
+          // Deliberately out of chronological order and interleaved across
+          // types, and includes two instances of the same type (snack), to
+          // assert the flat list sorts by `loggedAt` rather than by type or
+          // by insertion order.
+          breakfast: [
+            {
+              id: 2,
+              loggedAt: "2026-07-20T12:00:00Z",
+              mealType: "breakfast",
+              notes: null,
+              items: [makeItem({ id: 21, name: "Late breakfast item" })],
+              totals: { calories: 300, proteinG: 20, carbsG: 30, fatG: 10, fiberG: 0, satFatG: 0, sodiumMg: 0 }
+            }
+          ],
+          snack: [
+            {
+              id: 1,
+              loggedAt: "2026-07-20T07:00:00Z",
+              mealType: "snack",
+              notes: null,
+              items: [makeItem({ id: 11, name: "Early snack item" })],
+              totals: { calories: 100, proteinG: 5, carbsG: 10, fatG: 2, fiberG: 0, satFatG: 0, sodiumMg: 0 }
+            },
+            {
+              id: 3,
+              loggedAt: "2026-07-20T18:00:00Z",
+              mealType: "snack",
+              notes: null,
+              items: [makeItem({ id: 31, name: "Late snack item" })],
+              totals: { calories: 150, proteinG: 5, carbsG: 15, fatG: 3, fiberG: 0, satFatG: 0, sodiumMg: 0 }
+            }
+          ]
+        }
+      })
+    );
+    renderPage();
+
+    const toggles = await screen.findAllByRole("button", { name: /snack|breakfast/i });
+    // Three meal-instance rows, ordered by loggedAt ascending: 7am snack
+    // (100 cal), 12pm breakfast (300 cal), 6pm snack (150 cal) — irrespective
+    // of meal type. Distinguish rows by their per-meal calorie total (fixed
+    // fixture values, unlike the wall-clock-formatted time which shifts with
+    // the test runner's local timezone) rather than by exact time text.
+    expect(toggles).toHaveLength(3);
+    expect(toggles[0]).toHaveAccessibleName(/snack/i);
+    expect(toggles[0]).toHaveAccessibleName(/100 cal/);
+    expect(toggles[1]).toHaveAccessibleName(/breakfast/i);
+    expect(toggles[1]).toHaveAccessibleName(/300 cal/);
+    expect(toggles[2]).toHaveAccessibleName(/snack/i);
+    expect(toggles[2]).toHaveAccessibleName(/150 cal/);
+  });
+
+  it("expands multiple meal rows independently (per-row local state)", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        meals: {
+          breakfast: [
+            {
+              id: 1,
+              loggedAt: "2026-07-20T07:00:00Z",
+              mealType: "breakfast",
+              notes: null,
+              items: [makeItem({ id: 11, name: "Oats" })],
+              totals: { calories: 300, proteinG: 20, carbsG: 30, fatG: 10, fiberG: 0, satFatG: 0, sodiumMg: 0 }
+            }
+          ],
+          lunch: [
+            {
+              id: 2,
+              loggedAt: "2026-07-20T12:00:00Z",
+              mealType: "lunch",
+              notes: null,
+              items: [makeItem({ id: 21, name: "Chicken salad" })],
+              totals: { calories: 400, proteinG: 30, carbsG: 20, fatG: 15, fiberG: 0, satFatG: 0, sodiumMg: 0 }
+            }
+          ]
+        }
+      })
+    );
+    renderPage();
+
+    const breakfastToggle = await screen.findByRole("button", { name: /breakfast/i });
+    const lunchToggle = await screen.findByRole("button", { name: /lunch/i });
+
+    fireEvent.click(breakfastToggle);
+    expect(screen.getByText("Oats")).toBeInTheDocument();
+    expect(screen.queryByText("Chicken salad")).not.toBeInTheDocument();
+
+    fireEvent.click(lunchToggle);
+    // Both rows stay open independently.
+    expect(screen.getByText("Oats")).toBeInTheDocument();
+    expect(screen.getByText("Chicken salad")).toBeInTheDocument();
+
+    fireEvent.click(breakfastToggle);
+    expect(screen.queryByText("Oats")).not.toBeInTheDocument();
+    expect(screen.getByText("Chicken salad")).toBeInTheDocument();
+  });
+
+  it("shows per-meal P/C/F totals and per-food macros/quantity in the expanded detail", async () => {
+    mockedGetDay.mockResolvedValue(
+      makeDay({
+        meals: {
+          breakfast: [
+            {
+              id: 5,
+              loggedAt: "2026-07-20T08:00:00Z",
+              mealType: "breakfast",
+              notes: null,
+              items: [makeItem()],
+              totals: { calories: 250, proteinG: 40, carbsG: 1, fatG: 8, fiberG: 0, satFatG: 2, sodiumMg: 300 }
+            }
+          ]
+        }
+      })
+    );
+    renderPage();
+
+    const toggle = await screen.findByRole("button", { name: /breakfast/i });
+    // Per-meal totals shown on the collapsed row itself.
+    expect(toggle).toHaveAccessibleName(/250 cal/);
+    expect(toggle).toHaveAccessibleName(/P 40\.0g/);
+    expect(toggle).toHaveAccessibleName(/C 1\.0g/);
+    expect(toggle).toHaveAccessibleName(/F 8\.0g/);
+
+    fireEvent.click(toggle);
+    // Per-food quantity/unit and macros in the expanded detail (the row
+    // header above already shows the same P 40.0g total, so there are two
+    // matches once expanded — assert at least one rather than a single one).
+    expect(screen.getByText("150.0 g")).toBeInTheDocument();
+    expect(screen.getAllByText(/P 40\.0g/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows an error toast and keeps the editor open when logging a meal fails", async () => {
