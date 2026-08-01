@@ -1,8 +1,7 @@
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 import TokenGate from "./auth/TokenGate";
 import ErrorBoundary from "./design/ErrorBoundary";
-import TodayPage from "./pages/TodayPage";
-import DayPage from "./pages/DayPage";
+import DayView from "./pages/DayView";
 import TrendsPage from "./pages/TrendsPage";
 import CalendarPage from "./pages/CalendarPage";
 import FoodsPage from "./pages/FoodsPage";
@@ -52,8 +51,8 @@ export default function App(): JSX.Element {
               fallback UI stuck on screen for a route that isn't actually broken. */}
           <ErrorBoundary key={location.pathname}>
             <Routes>
-              <Route path="/" element={<TodayPage />} />
-              <Route path="/day/:date" element={<DayPage />} />
+              <Route path="/" element={<DayView />} />
+              <Route path="/day/:date" element={<DayView />} />
               <Route path="/trends" element={<TrendsPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/foods" element={<FoodsPage />} />
