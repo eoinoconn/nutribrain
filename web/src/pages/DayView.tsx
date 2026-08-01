@@ -39,8 +39,9 @@ import Skeleton from "../design/Skeleton";
 import EmptyState from "../design/EmptyState";
 import type { DayResponse, MealItemRequest, MealType } from "../lib/api/types";
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
+import { QuickMacroEntry, type QuickMacroValue } from "../components/QuickMacroEntry";
 import { DayHeader, MEAL_TYPE_LABELS, MEAL_TYPE_ORDER, SummaryRow, formatCalories } from "../components/DaySummary";
-import { buildCreateMealRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
+import { buildCreateMealRequest, buildQuickMacroRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
 import { addDays, dayTitleLabel } from "../lib/dateNav";
 
 /** Best-effort key only; the header's displayed date always comes from the
@@ -93,6 +94,11 @@ export default function DayView(): JSX.Element {
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editorValue, setEditorValue] = useState<MealEditorValue | null>(null);
+  // Independent of `isEditorOpen`/`editorValue` (the `MealEditor` panel's
+  // state) — "Log macros" is a separate lightweight panel that can be open
+  // on its own, per §4 of docs/features/today_ui_redesign.md.
+  const [isQuickMacroOpen, setIsQuickMacroOpen] = useState(false);
+  const [quickMacroValue, setQuickMacroValue] = useState<QuickMacroValue | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingItemValue, setEditingItemValue] = useState<MealEditorItem | null>(null);
@@ -126,6 +132,29 @@ export default function DayView(): JSX.Element {
       showToast("Meal logged.", "success");
       setIsEditorOpen(false);
       setEditorValue(null);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.day(localDate) });
+    }
+  });
+
+  const logMacrosMutation = useMutation({
+    mutationFn: (payload: NonNullable<ReturnType<typeof buildQuickMacroRequest>>) => createMeal(payload),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.day(localDate) });
+      const previous = queryClient.getQueryData<DayResponse>(queryKeys.day(localDate));
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.day(localDate), context.previous);
+      }
+      showToast("Could not log macros.", "error");
+    },
+    onSuccess: () => {
+      showToast("Macros logged.", "success");
+      setIsQuickMacroOpen(false);
+      setQuickMacroValue(null);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.day(localDate) });
@@ -271,6 +300,22 @@ export default function DayView(): JSX.Element {
     logMealMutation.mutate(request);
   }
 
+  function handleToggleQuickMacro(): void {
+    setIsQuickMacroOpen((open) => !open);
+  }
+
+  function handleSubmitQuickMacro(): void {
+    // `quickMacroValue` is null until the form's `onChange` first fires
+    // (mirrors `MealEditor`'s `onChange`-reports-up pattern) — treat an
+    // untouched form the same as one missing required fields.
+    const request = quickMacroValue ? buildQuickMacroRequest(quickMacroValue, dayQuery.data?.date ?? localDate) : null;
+    if (!request) {
+      showToast("Enter calories, protein, carbs, and fat before saving.", "error");
+      return;
+    }
+    logMacrosMutation.mutate(request);
+  }
+
   function toggleGroup(key: string): void {
     setExpanded((current) => ({ ...current, [key]: !current[key] }));
   }
@@ -387,6 +432,14 @@ export default function DayView(): JSX.Element {
         >
           {isEditorOpen ? "Cancel" : "Log a meal"}
         </button>
+        <button
+          type="button"
+          onClick={handleToggleQuickMacro}
+          aria-expanded={isQuickMacroOpen}
+          className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          {isQuickMacroOpen ? "Cancel" : "Log macros"}
+        </button>
         {isToday ? (
           <button
             type="button"
@@ -409,6 +462,20 @@ export default function DayView(): JSX.Element {
             className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
           >
             {logMealMutation.isPending ? "Saving..." : "Save meal"}
+          </button>
+        </div>
+      ) : null}
+
+      {isQuickMacroOpen ? (
+        <div className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+          <QuickMacroEntry onChange={setQuickMacroValue} />
+          <button
+            type="button"
+            onClick={handleSubmitQuickMacro}
+            disabled={logMacrosMutation.isPending}
+            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+          >
+            {logMacrosMutation.isPending ? "Saving..." : "Save macros"}
           </button>
         </div>
       ) : null}

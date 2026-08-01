@@ -529,6 +529,101 @@ describe("DayView", () => {
     expect(await screen.findByText("Chicken breast")).toBeInTheDocument();
   });
 
+  describe("Log macros (quick ad-hoc entry)", () => {
+    it("opens independently of the meal editor panel", async () => {
+      mockedGetDay.mockResolvedValue(makeDay());
+      renderPage();
+
+      const mealButton = (await screen.findAllByRole("button", { name: /^log a meal$/i }))[0]!;
+      const macroButton = await screen.findByRole("button", { name: /^log macros$/i });
+
+      fireEvent.click(macroButton);
+      expect(screen.getByRole("form", { name: /log macros/i })).toBeInTheDocument();
+      expect(screen.queryByRole("form", { name: /^meal editor$/i })).not.toBeInTheDocument();
+
+      fireEvent.click(mealButton);
+      expect(screen.getByRole("form", { name: /^meal editor$/i })).toBeInTheDocument();
+      // Opening the meal editor doesn't close the macros panel or vice versa.
+      expect(screen.getByRole("form", { name: /log macros/i })).toBeInTheDocument();
+    });
+
+    it("defaults meal_type=snack and logged_at=now, and submits a single ad-hoc item via createMeal", async () => {
+      mockedGetDay.mockResolvedValue(makeDay());
+      mockedCreateMeal.mockResolvedValue({
+        id: 7,
+        loggedAt: "2026-07-20T12:00:00Z",
+        localTz: "UTC",
+        localDate: "2026-07-20",
+        mealType: "snack",
+        notes: null,
+        items: [],
+        totals: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: null, satFatG: null, sodiumMg: null },
+        deltaVsTarget: null
+      });
+      renderPage();
+
+      fireEvent.click(await screen.findByRole("button", { name: /^log macros$/i }));
+      expect(screen.getByLabelText(/meal type/i)).toHaveValue("snack");
+
+      fireEvent.change(screen.getByLabelText(/^calories$/i), { target: { value: "250" } });
+      fireEvent.change(screen.getByLabelText(/protein/i), { target: { value: "20" } });
+      fireEvent.change(screen.getByLabelText(/carbs/i), { target: { value: "30" } });
+      fireEvent.change(screen.getByLabelText(/^fat/i), { target: { value: "5" } });
+
+      fireEvent.click(screen.getByRole("button", { name: /save macros/i }));
+
+      await waitFor(() => expect(mockedCreateMeal).toHaveBeenCalledTimes(1));
+      const [request] = mockedCreateMeal.mock.calls[0]!;
+      expect(request.mealType).toBe("snack");
+      expect(request.items).toEqual([
+        {
+          name: "Quick entry",
+          quantity: 1,
+          quantityUnit: "serving",
+          foodId: null,
+          calories: 250,
+          proteinG: 20,
+          carbsG: 30,
+          fatG: 5,
+          fiberG: null,
+          satFatG: null,
+          sodiumMg: null
+        }
+      ]);
+      expect(request.loggedAt).toMatch(/Z$|[+-]\d{2}:\d{2}$/);
+
+      expect(await screen.findByText(/macros logged/i)).toBeInTheDocument();
+    });
+
+    it("requires calories, protein, carbs, and fat before submitting", async () => {
+      mockedGetDay.mockResolvedValue(makeDay());
+      renderPage();
+
+      fireEvent.click(await screen.findByRole("button", { name: /^log macros$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /save macros/i }));
+
+      expect(await screen.findByText(/enter calories, protein, carbs, and fat/i)).toBeInTheDocument();
+      expect(mockedCreateMeal).not.toHaveBeenCalled();
+    });
+
+    it("shows an error toast and keeps the panel open when logging macros fails", async () => {
+      mockedGetDay.mockResolvedValue(makeDay());
+      mockedCreateMeal.mockRejectedValue(new Error("failed"));
+      renderPage();
+
+      fireEvent.click(await screen.findByRole("button", { name: /^log macros$/i }));
+      fireEvent.change(screen.getByLabelText(/^calories$/i), { target: { value: "250" } });
+      fireEvent.change(screen.getByLabelText(/protein/i), { target: { value: "20" } });
+      fireEvent.change(screen.getByLabelText(/carbs/i), { target: { value: "30" } });
+      fireEvent.change(screen.getByLabelText(/^fat/i), { target: { value: "5" } });
+
+      fireEvent.click(screen.getByRole("button", { name: /save macros/i }));
+
+      expect(await screen.findByText(/could not log macros/i)).toBeInTheDocument();
+      expect(screen.getByRole("form", { name: /log macros/i })).toBeInTheDocument();
+    });
+  });
+
   it("logs a new meal via the shared MealEditor for this date", async () => {
     mockedGetDay.mockResolvedValue(makeDay());
     mockedCreateMeal.mockResolvedValue({
