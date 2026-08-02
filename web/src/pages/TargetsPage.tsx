@@ -182,7 +182,7 @@ export default function TargetsPage(): JSX.Element {
         <button
           type="button"
           onClick={() => void targetsQuery.refetch()}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
         >
           Retry
         </button>
@@ -198,7 +198,7 @@ export default function TargetsPage(): JSX.Element {
           type="button"
           onClick={() => (isCreateOpen ? handleCloseCreate() : handleOpenCreate())}
           aria-expanded={isCreateOpen}
-          className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+          className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent"
         >
           {isCreateOpen ? "Cancel" : "New target"}
         </button>
@@ -221,10 +221,10 @@ export default function TargetsPage(): JSX.Element {
           action={{ label: "New target", onClick: handleOpenCreate }}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+        <div className="overflow-x-auto rounded-lg border border-line dark:border-line-dark">
           <table className="w-full min-w-[520px] text-left text-sm">
             <caption className="sr-only">Versioned targets, most recent effective date first</caption>
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-tertiary dark:border-line-dark dark:text-ink-secondary-dark">
               <tr>
                 <th scope="col" className="px-3 py-2 font-semibold">
                   Effective from
@@ -245,11 +245,11 @@ export default function TargetsPage(): JSX.Element {
             </thead>
             <tbody>
               {sortedTargets.map((target, index) => (
-                <tr key={target.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800/60">
+                <tr key={target.id} className="border-b border-line last:border-0 dark:border-line-dark/60">
                   <td className="px-3 py-2 font-medium">
                     {target.effectiveFrom}
                     {index === 0 ? (
-                      <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900 dark:text-sky-300">
+                      <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent dark:bg-accent-soft-dark dark:text-accent-dark">
                         Current
                       </span>
                     ) : null}
@@ -292,18 +292,18 @@ function TargetForm({
     <div
       role="region"
       aria-labelledby={headingId}
-      className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800"
+      className="space-y-4 rounded-lg border border-line p-4 dark:border-line-dark"
     >
       <h2 id={headingId} className="text-lg font-medium">
         New target
       </h2>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
         Creates a new versioned target. It never edits an earlier one &mdash; past targets stay as
         they were logged.
       </p>
       <form onSubmit={onSubmit} noValidate className="space-y-4" aria-label="New target">
         <div>
-          <label htmlFor={effectiveFromId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={effectiveFromId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Effective from
           </label>
           <input
@@ -311,13 +311,13 @@ function TargetForm({
             type="date"
             value={values.effectiveFrom}
             onChange={(event) => onChange({ ...values, effectiveFrom: event.target.value })}
-            className="focus-ring w-full max-w-xs rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full max-w-xs rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label htmlFor={caloriesId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={caloriesId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Base calories
             </label>
             <input
@@ -328,11 +328,11 @@ function TargetForm({
               step={1}
               value={values.baseCalories}
               onChange={(event) => onChange({ ...values, baseCalories: event.target.value })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={proteinId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={proteinId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Protein (g)
             </label>
             <input
@@ -343,11 +343,11 @@ function TargetForm({
               step={1}
               value={values.proteinG}
               onChange={(event) => onChange({ ...values, proteinG: event.target.value })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={carbsId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={carbsId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Carbs (g)
             </label>
             <input
@@ -358,11 +358,11 @@ function TargetForm({
               step={1}
               value={values.carbsG}
               onChange={(event) => onChange({ ...values, carbsG: event.target.value })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={fatId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={fatId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Fat (g)
             </label>
             <input
@@ -373,7 +373,7 @@ function TargetForm({
               step={1}
               value={values.fatG}
               onChange={(event) => onChange({ ...values, fatG: event.target.value })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
         </div>
@@ -388,7 +388,7 @@ function TargetForm({
           <button
             type="submit"
             disabled={isPending}
-            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             {isPending ? "Creating..." : "Create target"}
           </button>

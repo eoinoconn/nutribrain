@@ -7,6 +7,7 @@
 
 import { createItemKey, type MealEditorItem } from "../components/MealEditor/types";
 import type { MealEditorValue } from "../components/MealEditor";
+import type { QuickMacroValue } from "../components/QuickMacroEntry/types";
 import type { CreateMealRequest, MealItem, MealItemRequest, MealType } from "./api/types";
 
 export function mealEditorItemToRequest(item: MealEditorValue["items"][number]): MealItemRequest | null {
@@ -60,6 +61,44 @@ export function buildCreateMealRequest(
     loggedAt: buildLoggedAt(localDate, editorValue.time),
     localTz,
     mealType: editorValue.mealType
+  };
+}
+
+/**
+ * Assembles the `POST /api/meals` request for the "Log macros" quick-entry
+ * form (§4 of docs/features/today_ui_redesign.md): a single ad-hoc
+ * (`food_id` NULL) meal_item carrying directly-entered macro totals, no food
+ * search. Calories/protein/carbs/fat are required (returns `null`, mirroring
+ * `buildCreateMealRequest`'s "nothing to submit" signal, if any is missing);
+ * fiber/sat-fat/sodium stay optional. There's no food/quantity concept here
+ * since the user is typing raw totals, so this follows the same fixed
+ * convention as `MealItemRow`'s ad-hoc default (`quantity: 1`,
+ * `quantityUnit: "serving"`), with `name` defaulting to "Quick entry" when
+ * left blank.
+ */
+export function buildQuickMacroRequest(value: QuickMacroValue, localDate: string): CreateMealRequest | null {
+  if (value.calories === null || value.proteinG === null || value.carbsG === null || value.fatG === null) {
+    return null;
+  }
+  const item: MealItemRequest = {
+    name: value.name.trim() === "" ? "Quick entry" : value.name.trim(),
+    quantity: 1,
+    quantityUnit: "serving",
+    foodId: null,
+    calories: value.calories,
+    proteinG: value.proteinG,
+    carbsG: value.carbsG,
+    fatG: value.fatG,
+    fiberG: value.fiberG,
+    satFatG: value.satFatG,
+    sodiumMg: value.sodiumMg
+  };
+  const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return {
+    items: [item],
+    loggedAt: buildLoggedAt(localDate, value.time),
+    localTz,
+    mealType: value.mealType
   };
 }
 

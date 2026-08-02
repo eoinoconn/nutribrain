@@ -81,7 +81,7 @@ export default function FoodSearchField({ itemIndex, selectedName, onPick }: Foo
 
   return (
     <div className="relative flex-1">
-      <label htmlFor={inputId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+      <label htmlFor={inputId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
         Food (item {itemIndex + 1})
       </label>
       <input
@@ -103,14 +103,14 @@ export default function FoodSearchField({ itemIndex, selectedName, onPick }: Foo
         onBlur={closeList}
         onKeyDown={handleKeyDown}
         placeholder="Search foods..."
-        className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
       />
       {isOpen && query.trim().length > 0 ? (
         <ul
           id={listboxId}
           role="listbox"
           aria-label="Food search results"
-          className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-line bg-white shadow-lg dark:border-line-dark dark:bg-canvas-dark"
         >
           {isLoading ? (
             <li className="px-3 py-2">
@@ -119,7 +119,7 @@ export default function FoodSearchField({ itemIndex, selectedName, onPick }: Foo
           ) : isError ? (
             <li className="px-3 py-2 text-sm text-red-600 dark:text-red-400">Food search failed. Try again.</li>
           ) : results.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">No foods found.</li>
+            <li className="px-3 py-2 text-sm text-ink-tertiary dark:text-ink-secondary-dark">No foods found.</li>
           ) : (
             results.map((food, index) => (
               <li
@@ -136,8 +136,8 @@ export default function FoodSearchField({ itemIndex, selectedName, onPick }: Foo
                     handlePick(food);
                   }}
                   onMouseEnter={() => setActiveIndex(index)}
-                  className={`focus-ring flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                    index === activeIndex ? "bg-slate-100 dark:bg-slate-800" : ""
+                  className={`focus-ring flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-canvas dark:hover:bg-panel-dark ${
+                    index === activeIndex ? "bg-canvas dark:bg-panel-dark" : ""
                   }`}
                 >
                   {food.isFavorite ? (

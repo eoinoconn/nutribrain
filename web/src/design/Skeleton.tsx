@@ -14,7 +14,7 @@ export default function Skeleton({ className = "h-4 w-full", label = "Loading" }
     <span
       role="status"
       aria-label={label}
-      className={`relative inline-block overflow-hidden rounded-md bg-slate-200 dark:bg-slate-800 ${className}`}
+      className={`relative inline-block overflow-hidden rounded-md bg-line dark:bg-panel-dark ${className}`}
     >
       <span
         aria-hidden="true"

@@ -22,15 +22,15 @@ interface EmptyStateProps {
  */
 export default function EmptyState({ message, nudge, action, icon }: EmptyStateProps): JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-slate-300 px-6 py-10 text-center dark:border-slate-700">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line px-6 py-10 text-center dark:border-line-dark">
       {icon ? <div aria-hidden="true">{icon}</div> : null}
-      <p className="text-base font-medium text-slate-700 dark:text-slate-300">{message}</p>
-      {nudge ? <p className="text-sm text-slate-500 dark:text-slate-400">{nudge}</p> : null}
+      <p className="text-base font-medium text-ink-secondary dark:text-ink-secondary-dark">{message}</p>
+      {nudge ? <p className="text-sm text-ink-tertiary dark:text-ink-secondary-dark">{nudge}</p> : null}
       {action ? (
         <button
           type="button"
           onClick={action.onClick}
-          className="focus-ring mt-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+          className="focus-ring mt-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent"
         >
           {action.label}
         </button>

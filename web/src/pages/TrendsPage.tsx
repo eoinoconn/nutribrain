@@ -48,9 +48,11 @@ import {
   type TrendRow
 } from "../lib/trends";
 
-const CALORIE_COLOR = "#0284c7"; // sky-600, matches the app's one existing accent color
-const TARGET_COLOR = "#64748b"; // slate-500, muted so it reads as an overlay, not a series
-const PROTEIN_COLOR = "#0284c7"; // sky-600
+const CALORIE_COLOR = "#c2410c"; // accent (orange-700, tailwind.config.ts `accent`), the app's brand accent
+const TARGET_COLOR = "#71717a"; // ink-tertiary (zinc-500), muted so it reads as an overlay, not a series
+const PROTEIN_COLOR = "#0284c7"; // sky-600, kept distinct from CALORIE_COLOR/accent so it doesn't read as the
+// same series as the calorie line, and distinct from CARBS_COLOR (amber-600) so adjacent stacked-bar
+// segments aren't both orange-family hues
 const CARBS_COLOR = "#d97706"; // amber-600
 const FAT_COLOR = "#7c3aed"; // violet-600
 
@@ -82,8 +84,8 @@ function RangeSelector({
             onClick={() => onChange(days)}
             className={`focus-ring rounded-md border px-3 py-1.5 text-sm font-medium ${
               isSelected
-                ? "border-sky-600 bg-sky-600 text-white"
-                : "border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                ? "border-accent bg-accent text-white"
+                : "border-line text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
             }`}
           >
             {days}d
@@ -108,7 +110,7 @@ function CalorieTrendChart({ rows }: { rows: TrendRow[] }): JSX.Element {
       <div className="h-64 w-full" role="img" aria-label="Line chart of daily calories against target">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-line dark:stroke-line-dark" />
             <XAxis dataKey="date" tickFormatter={formatShortDate} tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} width={48} />
             <Tooltip
@@ -136,7 +138,7 @@ function CalorieTrendChart({ rows }: { rows: TrendRow[] }): JSX.Element {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
         {first && last ? (
           <>
             From {first.date} to {last.date}, calories averaged {formatCalories(avgCalories)} per day
@@ -176,7 +178,7 @@ function MacroStackedBarChart({ rows }: { rows: TrendRow[] }): JSX.Element {
       >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-line dark:stroke-line-dark" />
             <XAxis dataKey="date" tickFormatter={formatShortDate} tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} width={48} />
             <Tooltip formatter={(value: number, name: string) => [`${value.toFixed(1)} g`, name]} />
@@ -187,7 +189,7 @@ function MacroStackedBarChart({ rows }: { rows: TrendRow[] }): JSX.Element {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
         Averaged over {rows.length} day{rows.length === 1 ? "" : "s"}: {avgProtein.toFixed(1)} g protein,{" "}
         {avgCarbs.toFixed(1)} g carbs, and {avgFat.toFixed(1)} g fat per day.
       </p>
@@ -197,10 +199,10 @@ function MacroStackedBarChart({ rows }: { rows: TrendRow[] }): JSX.Element {
 
 function StatTile({ label, value, detail }: { label: string; value: string; detail?: string }): JSX.Element {
   return (
-    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-      <dt className="text-sm font-medium text-slate-600 dark:text-slate-400">{label}</dt>
+    <div className="rounded-lg border border-line p-4 dark:border-line-dark">
+      <dt className="text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">{label}</dt>
       <dd className="mt-1 text-2xl font-bold tracking-tight">{value}</dd>
-      {detail ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{detail}</p> : null}
+      {detail ? <p className="mt-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{detail}</p> : null}
     </div>
   );
 }
@@ -267,7 +269,7 @@ export default function TrendsPage(): JSX.Element {
           <button
             type="button"
             onClick={() => void rangeQuery.refetch()}
-            className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
           >
             Retry
           </button>

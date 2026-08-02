@@ -16,12 +16,23 @@ vi.mock("./lib/api/client", () => ({
 
 const mockedGetDay = vi.mocked(getDay);
 
+function todayLocalDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.clearAllMocks();
     mockedGetDay.mockResolvedValue({
-      date: "2026-07-27",
+      // The "/" route's DayView shows a "Today" heading only when the
+      // fetched day's date matches the browser's local today, so this must
+      // track the real date rather than a hardcoded string.
+      date: todayLocalDate(),
       meals: {},
       dayTotals: {
         calories: 0,

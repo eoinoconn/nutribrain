@@ -83,7 +83,7 @@ function Legend(): JSX.Element {
       {ADHERENCE_ORDER.map((state) => (
         <li key={state} className="flex items-center gap-1.5">
           <span className={`h-3 w-3 rounded-sm ${ADHERENCE_STYLES[state].bgClass}`} />
-          <span className="text-slate-600 dark:text-slate-400">{ADHERENCE_STYLES[state].label}</span>
+          <span className="text-ink-secondary dark:text-ink-secondary-dark">{ADHERENCE_STYLES[state].label}</span>
         </li>
       ))}
     </ul>
@@ -93,7 +93,7 @@ function Legend(): JSX.Element {
 function CalendarSummaryText({ days }: { days: HeatmapDay[] }): JSX.Element {
   const summary = computeCalendarSummary(days);
   return (
-    <p className="text-sm text-slate-600 dark:text-slate-400">
+    <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
       {summary.daysInTarget} day{summary.daysInTarget === 1 ? "" : "s"} in target over the last {days.length} days
       {summary.daysLogged > 0 ? ` (${summary.daysLogged} day${summary.daysLogged === 1 ? "" : "s"} logged)` : ""},
       longest in-target streak {summary.longestStreakDays} day{summary.longestStreakDays === 1 ? "" : "s"}.
@@ -124,7 +124,7 @@ export default function CalendarPage(): JSX.Element {
     <section className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Adherence over the last twelve months.</p>
+        <p className="mt-1 text-sm text-ink-secondary dark:text-ink-secondary-dark">Adherence over the last twelve months.</p>
       </header>
 
       {rangeQuery.isLoading ? (
@@ -141,7 +141,7 @@ export default function CalendarPage(): JSX.Element {
           <button
             type="button"
             onClick={() => void rangeQuery.refetch()}
-            className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
           >
             Retry
           </button>
@@ -158,7 +158,7 @@ export default function CalendarPage(): JSX.Element {
                 showWeekdayLabels
                 gutterSize={2}
                 classForValue={(day) =>
-                  day ? `${FILL_CLASS[day.state]} stroke-white dark:stroke-slate-950` : "fill-adherence-no-log"
+                  day ? `${FILL_CLASS[day.state]} stroke-white dark:stroke-canvas-dark` : "fill-adherence-no-log"
                 }
                 titleForValue={(day) => (day ? describeDay(day) : null)}
                 onClick={(day) => goToDay(day)}
@@ -174,7 +174,7 @@ export default function CalendarPage(): JSX.Element {
             {tooltip ? (
               <div
                 role="tooltip"
-                className="pointer-events-none fixed z-10 max-w-xs rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="pointer-events-none fixed z-10 max-w-xs rounded-md border border-line bg-white px-3 py-2 text-xs text-ink-secondary shadow-lg dark:border-line-dark dark:bg-canvas-dark dark:text-ink-secondary-dark"
                 style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
               >
                 {tooltip.text}
@@ -223,7 +223,7 @@ function makeDayCellFocusable(
     tabIndex: 0,
     role: "button",
     "aria-label": label,
-    className: `${element.props.className ?? ""} cursor-pointer outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500`,
+    className: `${element.props.className ?? ""} cursor-pointer outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`,
     onFocus: (event: FocusEvent<SVGRectElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
       if (day) {

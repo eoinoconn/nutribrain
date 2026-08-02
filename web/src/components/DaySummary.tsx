@@ -7,6 +7,7 @@
  * target math happens here, per CLAUDE.md).
  */
 
+import type { ReactNode } from "react";
 import type { DayResponse, ItemMacros, MealType } from "../lib/api/types";
 
 export function formatCalories(value: number): string {
@@ -17,27 +18,113 @@ export function formatGrams(value: number): string {
   return value.toFixed(1);
 }
 
-export function DayHeader({ day, title }: { day: DayResponse; title: string }): JSX.Element {
+/**
+ * Prev arrow / native date input / next arrow, styled per the app's
+ * existing slate/sky Tailwind tokens (only the *structure* — arrows either
+ * side of a native `<input type="date">` — is borrowed from
+ * `nutrition-ui-redesign.html`'s `.date-picker`; its colors are a separate,
+ * later task per §7). All calendar-day arithmetic and the date-string
+ * source of truth live in the caller (`DayView.tsx` + `../lib/dateNav`) —
+ * this component only renders controls and reports raw intent upward.
+ */
+export function DatePicker({
+  date,
+  onPrevDay,
+  onNextDay,
+  onDateChange
+}: {
+  date: string;
+  onPrevDay: () => void;
+  onNextDay: () => void;
+  onDateChange: (nextDate: string) => void;
+}): JSX.Element {
+  return (
+    <div className="flex shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 dark:border-line-dark">
+      <button
+        type="button"
+        aria-label="Previous day"
+        onClick={onPrevDay}
+        className="focus-ring rounded-md px-2 py-1 text-lg leading-none text-ink-secondary hover:bg-canvas hover:text-accent dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
+      >
+        <span aria-hidden="true">&#8249;</span>
+      </button>
+      <input
+        type="date"
+        aria-label="Select date"
+        value={date}
+        onChange={(event) => {
+          if (event.target.value) {
+            onDateChange(event.target.value);
+          }
+        }}
+        className="focus-ring rounded-md border-0 bg-transparent px-1 py-1 text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark"
+      />
+      <button
+        type="button"
+        aria-label="Next day"
+        onClick={onNextDay}
+        className="focus-ring rounded-md px-2 py-1 text-lg leading-none text-ink-secondary hover:bg-canvas hover:text-accent dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
+      >
+        <span aria-hidden="true">&#8250;</span>
+      </button>
+    </div>
+  );
+}
+
+export function DayHeader({
+  day,
+  title,
+  onPrevDay,
+  onNextDay,
+  onDateChange,
+  caloriesOutToggle,
+  caloriesOutPanel
+}: {
+  day: DayResponse;
+  title: string;
+  onPrevDay: () => void;
+  onNextDay: () => void;
+  onDateChange: (nextDate: string) => void;
+  /** Compact toggle button rendered directly to the left of `DatePicker` in
+   * the header row (docs/features/today_ui_redesign.md backlog: the manual
+   * calories-out override moved out of the page body into the header). Owned
+   * and composed by the caller (`DayView.tsx`) — this component stays
+   * presentational and only positions it. */
+  caloriesOutToggle?: ReactNode;
+  /** The collapsible override form itself, rendered as a full-width block
+   * below the header row when open — same "toggle row, panel underneath"
+   * shape as the other panels in `DayView.tsx`. */
+  caloriesOutPanel?: ReactNode;
+}): JSX.Element {
   const target = day.effectiveTarget;
   return (
-    <header className="space-y-1">
-      <h1 className="text-3xl font-bold tracking-tight">
-        {title} &mdash; {day.date}
-      </h1>
-      {target ? (
-        target.caloriesOut !== null ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
-            {formatCalories(target.caloriesOut)} out)
-          </p>
-        ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            target {formatCalories(target.effectiveCalories)} (no activity data)
-          </p>
-        )
-      ) : (
-        <p className="text-sm text-slate-600 dark:text-slate-400">No target set.</p>
-      )}
+    <header className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">
+            {title} &mdash; {day.date}
+          </h1>
+          {target ? (
+            target.caloriesOut !== null ? (
+              <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
+                target {formatCalories(target.effectiveCalories)} ({formatCalories(target.baseCalories)} base +{" "}
+                {formatCalories(target.caloriesOut)} out)
+              </p>
+            ) : (
+              <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
+                target {formatCalories(target.effectiveCalories)} (no activity data)
+              </p>
+            )
+          ) : (
+            <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">No target set.</p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {caloriesOutToggle}
+          <DatePicker date={day.date} onPrevDay={onPrevDay} onNextDay={onNextDay} onDateChange={onDateChange} />
+        </div>
+      </div>
+      {caloriesOutPanel}
     </header>
   );
 }
@@ -58,7 +145,7 @@ export function CalorieProgress({
   return (
     <div className="flex flex-col items-center gap-2">
       <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-hidden="true">
-        <circle cx="70" cy="70" r={radius} fill="none" stroke="currentColor" strokeWidth="12" className="text-slate-200 dark:text-slate-800" />
+        <circle cx="70" cy="70" r={radius} fill="none" stroke="currentColor" strokeWidth="12" className="text-ink-secondary-dark dark:text-ink-primary" />
         <circle
           cx="70"
           cy="70"
@@ -67,13 +154,13 @@ export function CalorieProgress({
           stroke="currentColor"
           strokeWidth="12"
           strokeLinecap="round"
-          className="text-sky-600 transition-[stroke-dashoffset]"
+          className="text-accent transition-[stroke-dashoffset] dark:text-accent-dark"
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
           transform="rotate(-90 70 70)"
         />
       </svg>
-      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+      <p className="text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
         {targetCalories !== null
           ? `${formatCalories(totals.calories)} / ${formatCalories(targetCalories)} calories`
           : `${formatCalories(totals.calories)} calories (no target set)`}
@@ -100,14 +187,14 @@ function MacroBar({
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between text-sm">
-        <span className="font-medium text-slate-700 dark:text-slate-300">{label}</span>
-        <span className="text-slate-600 dark:text-slate-400">
+        <span className="font-medium text-ink-secondary dark:text-ink-secondary-dark">{label}</span>
+        <span className="text-ink-secondary dark:text-ink-secondary-dark">
           {targetGrams !== null ? `${formatGrams(grams)} / ${formatGrams(targetGrams)} g` : `${formatGrams(grams)} g`}
         </span>
       </div>
-      <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+      <div className="h-3 w-full overflow-hidden rounded-full bg-line dark:bg-panel-dark">
         <div
-          className="h-full rounded-full bg-sky-600"
+          className="h-full rounded-full bg-accent dark:bg-accent-dark"
           style={{ width: targetGrams !== null ? `${fraction * 100}%` : "100%" }}
         />
       </div>
@@ -124,7 +211,7 @@ export function MacroBars({
   target: DayResponse["effectiveTarget"];
 }): JSX.Element {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4">
       <MacroBar label="Protein" grams={totals.proteinG} targetGrams={target?.proteinG ?? null} />
       <MacroBar label="Carbs" grams={totals.carbsG} targetGrams={target?.carbsG ?? null} />
       <MacroBar label="Fat" grams={totals.fatG} targetGrams={target?.fatG ?? null} />
@@ -134,7 +221,7 @@ export function MacroBars({
 
 export function MicroRow({ totals }: { totals: ItemMacros }): JSX.Element {
   return (
-    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500 dark:text-slate-500">
+    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
       <div className="flex gap-1">
         <dt>Fiber</dt>
         <dd>{totals.fiberG !== null ? `${formatGrams(totals.fiberG)} g` : "—"}</dd>
@@ -151,7 +238,32 @@ export function MicroRow({ totals }: { totals: ItemMacros }): JSX.Element {
   );
 }
 
-export const MEAL_TYPE_ORDER: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
+/**
+ * Composes the calorie ring, macro bars, and micro-stats into the summary
+ * layout used by Day detail/Today (§2 of docs/features/today_ui_redesign.md):
+ * ring on the left, macro bars + micro row stacked in a column to its right,
+ * wrapping to a stacked layout below the `md` breakpoint. Pure layout — the
+ * three pieces it composes already receive and render the data.
+ */
+export function SummaryRow({
+  totals,
+  target
+}: {
+  totals: ItemMacros;
+  target: DayResponse["effectiveTarget"];
+}): JSX.Element {
+  return (
+    <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-10">
+      <div className="shrink-0">
+        <CalorieProgress totals={totals} target={target} />
+      </div>
+      <div className="w-full min-w-0 flex-1 space-y-4">
+        <MacroBars totals={totals} target={target} />
+        <MicroRow totals={totals} />
+      </div>
+    </div>
+  );
+}
 
 export const MEAL_TYPE_LABELS: Record<MealType, string> = {
   breakfast: "Breakfast",
