@@ -474,9 +474,15 @@ describe("DayView", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Chicken breast")).not.toBeInTheDocument();
 
+    // aria-controls must point at the id of the panel it reveals (§9
+    // accessibility audit), not just toggle aria-expanded on its own.
+    const controlsId = toggle.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Chicken breast")).toBeInTheDocument();
+    expect(document.getElementById(controlsId as string)).toContainElement(screen.getByText("Chicken breast"));
 
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");

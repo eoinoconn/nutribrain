@@ -548,6 +548,7 @@ export default function DayView(): JSX.Element {
         <div className="space-y-3">
           {flatMealGroups.map(({ mealType, group }) => {
             const isOpen = expanded[group.id] ?? false;
+            const panelId = `meal-items-panel-${group.id}`;
             return (
               <div key={group.id} className="rounded-lg border border-line dark:border-line-dark">
                 <div className="flex items-center gap-2 px-4 py-3">
@@ -555,6 +556,7 @@ export default function DayView(): JSX.Element {
                     type="button"
                     onClick={() => toggleGroup(group.id)}
                     aria-expanded={isOpen}
+                    aria-controls={panelId}
                     className="focus-ring flex flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-left"
                   >
                     <span className="flex items-center gap-3">
@@ -588,7 +590,7 @@ export default function DayView(): JSX.Element {
                   </button>
                 </div>
                 {isOpen ? (
-                  <div className="space-y-2 border-t border-line px-4 py-3 dark:border-line-dark">
+                  <div id={panelId} className="space-y-2 border-t border-line px-4 py-3 dark:border-line-dark">
                     <ul className="space-y-2 text-sm">
                       {group.items.map((item) => (
                         <li key={item.id} className="space-y-2">
