@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from app.db import (
     MealItemSource,
@@ -286,3 +287,67 @@ class AppSettingsDTO:
     """
 
     local_timezone: str
+
+
+@dataclass(frozen=True, slots=True)
+class EnergyPoint:
+    """One point on the energy-balance line (EC-05, §5).
+
+    ``balance`` is the cumulative net kcal balance (intake minus basal drain
+    minus workout expenditure) at ``at``. Rounded to the nearest whole kcal
+    at this DTO boundary -- intermediate accumulation is done in ``Decimal``
+    inside ``compute_energy_timeline``, per ``docs/style.md``'s "round only
+    at final serialization" rule, and this DTO is treated as that boundary
+    for the domain function's public return value.
+    """
+
+    at: datetime
+    balance: int
+
+
+@dataclass(frozen=True, slots=True)
+class EnergyEvent:
+    """A marker on the energy chart: a meal or a workout step (EC-05, §5).
+
+    ``status`` is only meaningful for ``kind="workout"`` (``"planned"`` or
+    ``"completed"``); ``None`` for meals. ``delta_kcal`` is the signed step
+    applied at ``at`` -- positive for a meal, negative for a workout.
+    """
+
+    at: datetime
+    delta_kcal: int
+    kind: Literal["meal", "workout"]
+    status: Literal["planned", "completed"] | None
+
+
+@dataclass(frozen=True, slots=True)
+class FuelingFlag:
+    """Fueling classification for a future planned workout (EC-05, §5).
+
+    Evaluated at the cumulative balance immediately before the workout's own
+    step is applied on the dashed/forecast line -- i.e. "how fueled are you
+    going into this session," not the balance after subtracting it.
+    """
+
+    workout_id: int
+    at: datetime
+    status: Literal["well_fueled", "under_fueled"]
+
+
+@dataclass(frozen=True, slots=True)
+class EnergyTimeline:
+    """Full energy-balance timeline for one local day (EC-05, §5).
+
+    ``points`` is the solid "so far" line from local midnight to ``now``;
+    ``forecast_points`` is the dashed line continuing from ``now`` to local
+    end-of-day under a zero-further-intake assumption (already-logged future
+    meals and future planned workouts are still included as known steps).
+    """
+
+    points: list[EnergyPoint]
+    forecast_points: list[EnergyPoint]
+    events: list[EnergyEvent]
+    current_balance: int
+    predicted_end_of_day: int
+    end_of_day_target: int
+    fueling_flags: list[FuelingFlag]

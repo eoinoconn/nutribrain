@@ -23,11 +23,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import PlannedWorkout, PlannedWorkoutSource, PlannedWorkoutStatus
+from app.domain.energy_balance import estimate_workout_calories
 from app.domain.intervals_sync import sync_intervals
-from app.domain.planned_workouts import (
-    estimate_workout_calories,
-    sync_planned_workouts,
-)
+from app.domain.planned_workouts import sync_planned_workouts
 from app.intervals.client import ActivityDetail, PlannedEventDetail
 
 _FROM = date(2026, 8, 1)

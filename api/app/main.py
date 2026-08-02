@@ -44,6 +44,7 @@ ERROR_STATUS_BY_CODE: dict[str, int] = {
     "meal_item_not_found": 404,
     "invalid_timezone": 422,
     "naive_datetime": 422,
+    "no_target_set": 404,
 }
 
 

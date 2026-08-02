@@ -137,6 +137,29 @@ class InvalidTimezoneError(DomainError):
         )
 
 
+# --- Energy balance errors --------------------------------------------------
+
+
+class NoTargetSetError(DomainError):
+    """compute_energy_timeline was asked for a day with no effective target.
+
+    Unlike ``get_day``, which tolerates a missing target by leaving
+    ``effective_target``/``delta_vs_target`` as ``None`` on its response, the
+    energy timeline's basal-drain line (§5 step 1) has no way to compute a
+    per-minute drain rate without a ``base_calories`` figure to divide by
+    1440 -- there's no sensible partial timeline to return. Routes/MCP tools
+    (EC-08, not built yet) are expected to catch this and render the "no
+    target set" empty state the spec (§8) describes, mirroring how
+    ``SummaryRow`` already handles a missing target on the frontend.
+    """
+
+    def __init__(self, day: object) -> None:
+        super().__init__(
+            error="no_target_set",
+            message=f"No target is set for {day}.",
+        )
+
+
 # --- Planned workout errors -------------------------------------------------
 
 

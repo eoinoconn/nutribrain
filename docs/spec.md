@@ -1027,6 +1027,7 @@ Error codes agents should handle:
 - `intervals_unavailable` — sync failed
 - `invalid_timezone` — `PATCH /api/settings` received a value that isn't a valid IANA timezone name
 - `naive_datetime` — a timestamp field (e.g. `POST /api/planned-workouts` `start_at`) is missing a UTC offset
+- `no_target_set` — `compute_energy_timeline` was asked for a day with no effective target set
 
 ## Appendix D — Sequence: label scan → log
 

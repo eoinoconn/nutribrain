@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.db import PlannedWorkout, PlannedWorkoutSource, PlannedWorkoutStatus
 from app.domain.dto import PlannedWorkoutDTO
+from app.domain.energy_balance import estimate_workout_calories
 from app.domain.errors import NaiveDatetimeError
 from app.domain.settings import get_settings
 from app.intervals.client import (
@@ -126,24 +127,10 @@ def create_manual_planned_workout(
 
 # --- EC-03: sync-side mapping + upsert (§6 "Sync changes") -----------------
 #
-# KCAL_PER_KILOJOULE / estimate_workout_calories live here, not in
-# `api/app/domain/energy_balance.py` as the spec's §6/"Workout calorie
-# estimation" section says. That module is EC-05's job and is being built in
-# parallel by another agent — creating it here would collide. This constant
-# has no dependents outside this module yet, so it's safe to park here and
-# let EC-05 import/relocate it once `energy_balance.py` exists.
-KCAL_PER_KILOJOULE = 1.1
-
-
-def estimate_workout_calories(icu_joules: int) -> int:
-    """Flat kJ -> kcal conversion for a planned workout that has icu_joules.
-
-    ``round(icu_joules / 1000 * KCAL_PER_KILOJOULE)`` per §6 "Workout calorie
-    estimation" — no historical-data lookup, no per-athlete calibration.
-    """
-
-    return round(icu_joules / 1000 * KCAL_PER_KILOJOULE)
-
+# KCAL_PER_KILOJOULE / estimate_workout_calories now live in
+# `api/app/domain/energy_balance.py`, per the spec's §6/"Workout calorie
+# estimation" section — relocated here by EC-05 once that module existed
+# (see this module's git history for the original parked implementation).
 
 FetchActivitiesDetailed = Callable[..., list[ActivityDetail]]
 FetchPlannedEvents = Callable[..., list[PlannedEventDetail]]

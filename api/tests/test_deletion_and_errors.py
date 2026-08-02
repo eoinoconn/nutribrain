@@ -33,6 +33,7 @@ APPENDIX_C_CODES = frozenset(
         "meal_item_not_found",
         "invalid_timezone",
         "naive_datetime",
+        "no_target_set",
     }
 )
 
