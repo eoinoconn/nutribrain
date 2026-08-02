@@ -26,7 +26,11 @@ from app.domain.dto import (
 from app.domain.errors import DomainError
 from app.domain.foods import FoodSearchResult
 from app.mcp._tool_common import capture_domain_error, run_with_session
-from app.mcp.date_args import resolve_date_arg, resolve_date_range_args
+from app.mcp.date_args import (
+    resolve_date_arg,
+    resolve_date_range_args,
+    resolve_effective_local_tz,
+)
 from app.mcp.serializers import (
     DayModel,
     EffectiveTargetModel,
@@ -53,11 +57,16 @@ type GetTargetResult = EffectiveTargetModel | ToolErrorResponse | None
 def register_read_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="get_day",
-        description="Get one day summary by date token (today/yesterday) or ISO date.",
+        description=(
+            "Get one day summary by date token (today/yesterday) or ISO date. "
+            "day defaults to today. local_tz defaults to the server's configured "
+            "timezone when omitted."
+        ),
     )
-    def get_day_tool(day: str, local_tz: str) -> GetDayResult:
-        resolved = resolve_date_arg(day, local_tz=local_tz)
+    def get_day_tool(day: str | None = None, local_tz: str | None = None) -> GetDayResult:
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            resolved = resolve_date_arg(day if day is not None else "today", local_tz=tz)
             result = cast(DayResponse, run_with_session(get_day, day=resolved))
         except DomainError as exc:
             return capture_domain_error(exc)
@@ -67,21 +76,23 @@ def register_read_tools(mcp: FastMCP) -> None:
         name="get_range",
         description=(
             "Get day or week range totals using date tokens or ISO dates. "
-            "Granularity is one of day/week."
+            "Granularity is one of day/week. from_date/to_date default to today. "
+            "local_tz defaults to the server's configured timezone when omitted."
         ),
     )
     def get_range_tool(
-        from_date: str,
-        to_date: str,
-        local_tz: str,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        local_tz: str | None = None,
         granularity: Literal["day", "week"] = "day",
     ) -> GetRangeResult:
-        start, end = resolve_date_range_args(
-            from_value=from_date,
-            to_value=to_date,
-            local_tz=local_tz,
-        )
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            start, end = resolve_date_range_args(
+                from_value=from_date if from_date is not None else "today",
+                to_value=to_date if to_date is not None else "today",
+                local_tz=tz,
+            )
             result = cast(
                 RangeResponse,
                 run_with_session(
@@ -145,11 +156,18 @@ def register_read_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="get_target",
-        description="Get effective target for one day using date token or ISO date.",
+        description=(
+            "Get effective target for one day using date token or ISO date. "
+            "day defaults to today. local_tz defaults to the server's configured "
+            "timezone when omitted."
+        ),
     )
-    def get_target_tool(day: str | date, local_tz: str) -> GetTargetResult:
-        resolved = resolve_date_arg(day, local_tz=local_tz)
+    def get_target_tool(
+        day: str | date | None = None, local_tz: str | None = None
+    ) -> GetTargetResult:
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            resolved = resolve_date_arg(day if day is not None else "today", local_tz=tz)
             result = cast(
                 EffectiveTarget | None,
                 run_with_session(get_effective_target, day=resolved),

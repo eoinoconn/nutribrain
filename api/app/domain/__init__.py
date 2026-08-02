@@ -33,6 +33,7 @@ from app.domain.errors import (
     FoodDuplicateError,
     FoodNotFoundError,
     IntervalsUnavailableError,
+    InvalidTimezoneError,
     MealItemFoodLinkedError,
     MealItemMacrosRequiredError,
     MealItemNotFoundError,
@@ -58,7 +59,12 @@ from app.domain.meal_deletion import delete_meal, delete_meal_item
 from app.domain.meal_editing import update_meal, update_meal_item
 from app.domain.meal_logging import log_meal
 from app.domain.meal_search import find_meal
-from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
+from app.domain.meal_timing import (
+    infer_meal_type,
+    localize_naive_datetime,
+    parse_local_date,
+    resolve_meal_type,
+)
 from app.domain.nutrition_math import (
     UnitNormalizationError,
     compute_item_macros,
@@ -86,6 +92,7 @@ __all__ = [
     "FoodNotFoundError",
     "FoodSearchResult",
     "IntervalsUnavailableError",
+    "InvalidTimezoneError",
     "ItemMacros",
     "ManualCaloriesOutResult",
     "MealItemFoodLinkedError",
@@ -126,6 +133,7 @@ __all__ = [
     "infer_meal_type",
     "list_targets",
     "list_templates",
+    "localize_naive_datetime",
     "log_meal",
     "log_template",
     "normalize_to_grams",

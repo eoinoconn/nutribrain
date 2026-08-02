@@ -7,8 +7,27 @@ resolved in the caller's local timezone.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.domain import parse_local_date
+from app.domain.errors import InvalidTimezoneError
+from app.settings import settings
+
+
+def resolve_effective_local_tz(explicit: str | None) -> str:
+    """Resolve the effective local timezone for one tool call.
+
+    Precedence: an explicit `local_tz` argument wins; otherwise fall back to
+    the server's configured default (`TZ` env var, `settings.tz`). Raises
+    `InvalidTimezoneError` if the resolved value isn't a valid IANA name.
+    """
+
+    candidate = explicit if explicit is not None else settings.tz
+    try:
+        ZoneInfo(candidate)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise InvalidTimezoneError(candidate) from exc
+    return candidate
 
 
 def resolve_date_arg(

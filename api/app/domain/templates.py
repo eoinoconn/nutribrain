@@ -32,7 +32,7 @@ from app.domain.dto import (
     TemplateResponse,
 )
 from app.domain.errors import TemplateNotFoundError
-from app.domain.meal_timing import resolve_meal_type
+from app.domain.meal_timing import localize_naive_datetime, resolve_meal_type
 from app.domain.nutrition_math import compute_item_macros
 
 
@@ -144,8 +144,8 @@ def log_template(
     - source: template on every resulting meal_item
     """
 
-    if logged_at.tzinfo is None:
-        raise ValueError("logged_at must be timezone-aware")
+    # A naive logged_at is interpreted in local_tz; an aware one is used as-is.
+    logged_at = localize_naive_datetime(logged_at, local_tz)
 
     template = _get_template_or_raise(session, template_id)
 

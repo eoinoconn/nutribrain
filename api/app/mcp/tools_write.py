@@ -39,7 +39,7 @@ from app.domain.errors import DomainError
 from app.domain.foods import AddFoodResult as AddFoodDomainResult
 from app.domain.foods import UpdateFoodResult as UpdateFoodDomainResult
 from app.mcp._tool_common import capture_domain_error, run_with_session
-from app.mcp.date_args import resolve_date_arg
+from app.mcp.date_args import resolve_date_arg, resolve_effective_local_tz
 from app.mcp.serializers import (
     DeleteResultModel,
     MealItemModel,
@@ -121,26 +121,31 @@ def register_write_tools(mcp: FastMCP) -> None:
         description=(
             "Log one meal with one or more items. Use this for normal meal logging; "
             "do not use update_food to fix a single meal because update_food rewrites "
-            "historical totals for every meal using that food."
+            "historical totals for every meal using that food. local_tz defaults to "
+            "the server's configured timezone when omitted. logged_at defaults to now; "
+            "if given naive (no offset/Z), it is interpreted in the effective local "
+            "timezone (explicit local_tz or the server default); if given with an "
+            "explicit offset, it is used as-is."
         ),
     )
     def log_meal_tool(
         items: list[MealItemInput],
-        local_tz: str,
+        local_tz: str | None = None,
         logged_at: datetime | None = None,
         meal_type: str | None = None,
         notes: str | None = None,
     ) -> LogMealResult:
-        when = logged_at or datetime.now(UTC)
         specs = [MealItemSpec(**item.model_dump()) for item in items]
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            when = logged_at or datetime.now(UTC)
             meal = cast(
                 MealResponse,
                 run_with_session(
                     log_meal,
                     items=specs,
                     logged_at=when,
-                    local_tz=local_tz,
+                    local_tz=tz,
                     meal_type=meal_type,
                     notes=notes,
                 ),
@@ -154,26 +159,30 @@ def register_write_tools(mcp: FastMCP) -> None:
         description=(
             "Log a previously created template into a meal. Templates are user-initiated "
             "shortcuts and should only be used when the user explicitly wants a repeatable "
-            "meal pattern."
+            "meal pattern. local_tz defaults to the server's configured timezone when "
+            "omitted. logged_at defaults to now; if given naive (no offset/Z), it is "
+            "interpreted in the effective local timezone (explicit local_tz or the "
+            "server default); if given with an explicit offset, it is used as-is."
         ),
     )
     def log_template_tool(
         template_id: int,
-        local_tz: str,
+        local_tz: str | None = None,
         logged_at: datetime | None = None,
         meal_type: str | None = None,
         quantity_scale: Decimal = Decimal("1"),
         notes: str | None = None,
     ) -> LogTemplateResult:
-        when = logged_at or datetime.now(UTC)
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            when = logged_at or datetime.now(UTC)
             meal = cast(
                 MealResponse,
                 run_with_session(
                     log_template,
                     template_id=template_id,
                     logged_at=when,
-                    local_tz=local_tz,
+                    local_tz=tz,
                     meal_type=meal_type,
                     quantity_scale=quantity_scale,
                     notes=notes,
@@ -370,7 +379,10 @@ def register_write_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="set_target",
-        description="Insert a new target version effective on a date token or ISO date.",
+        description=(
+            "Insert a new target version effective on a date token or ISO date. "
+            "local_tz defaults to the server's configured timezone when omitted."
+        ),
     )
     def set_target_tool(
         base_calories: int,
@@ -378,10 +390,11 @@ def register_write_tools(mcp: FastMCP) -> None:
         carbs_g: int,
         fat_g: int,
         effective_from: str,
-        local_tz: str,
+        local_tz: str | None = None,
     ) -> SetTargetResult:
-        day = resolve_date_arg(effective_from, local_tz=local_tz)
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            day = resolve_date_arg(effective_from, local_tz=tz)
             result = cast(
                 SetTargetDto,
                 run_with_session(

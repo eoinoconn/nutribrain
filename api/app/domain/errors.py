@@ -133,6 +133,19 @@ class MealItemMacrosRequiredError(DomainError):
         )
 
 
+# --- Timezone errors --------------------------------------------------------
+
+
+class InvalidTimezoneError(DomainError):
+    """An explicit or effective-default local_tz is not a valid IANA name."""
+
+    def __init__(self, tz: str) -> None:
+        super().__init__(
+            error="invalid_timezone",
+            message=f"'{tz}' is not a valid IANA timezone name.",
+        )
+
+
 # --- Template errors -------------------------------------------------------
 
 

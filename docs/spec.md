@@ -982,7 +982,7 @@ Establishes backups actually work.
 | `INTERVALS_API_KEY` | api, cron | intervals.icu HTTP Basic password |
 | `INTERVALS_ATHLETE_ID` | api, cron | intervals.icu athlete id |
 | `INTERVALS_SYNC_DAYS` | cron | Days of history to sync nightly (default 3) |
-| `TZ` | api, cron | `Europe/Dublin` |
+| `TZ` | api, cron, mcp | `Europe/Dublin`. Also the MCP server's default effective local timezone when a tool call omits `local_tz` |
 | `LOG_LEVEL` | api | `INFO` default, `DEBUG` for deep dives |
 | `SENTRY_DSN` | api, web | Optional |
 | `VITE_API_BASE` | web build | API base URL |
@@ -1029,6 +1029,7 @@ Error codes agents should handle:
 - `meal_item_not_found`
 - `meal_item_food_linked` — `update_meal_item` attempt to edit macros while `food_id` is set
 - `meal_item_macros_required` — `update_meal_item` cleared `food_id` without supplying the now-required macros
+- `invalid_timezone` — an explicit or effective-default `local_tz` is not a valid IANA timezone name
 
 ## Appendix D — Sequence: label scan → log
 

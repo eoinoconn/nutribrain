@@ -525,3 +525,86 @@ def test_log_meal_persists_to_database(
     assert meal is not None
     assert meal.logged_at == frozen_logged_at
     assert len(meal.items) == 1
+
+
+class TestLogMealLoggedAtLocalization:
+    """MCP-05: naive logged_at is localized via local_tz; aware is used as-is."""
+
+    def test_aware_logged_at_is_unchanged(
+        self,
+        db_session: Session,
+        dublin_tz: str,
+    ) -> None:
+        aware = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
+        items = [
+            MealItemSpec(
+                name="Ad-hoc",
+                quantity=Decimal("100"),
+                quantity_unit=QuantityUnit.g,
+                calories=Decimal("100"),
+                protein_g=Decimal("1"),
+                carbs_g=Decimal("1"),
+                fat_g=Decimal("1"),
+            ),
+        ]
+
+        response = log_meal(db_session, items=items, logged_at=aware, local_tz=dublin_tz)
+
+        assert response.logged_at == aware
+
+    def test_naive_logged_at_is_localized_to_local_tz(
+        self,
+        db_session: Session,
+        dublin_tz: str,
+    ) -> None:
+        naive = datetime(2026, 1, 15, 20, 0)  # noqa: DTZ001
+        items = [
+            MealItemSpec(
+                name="Ad-hoc",
+                quantity=Decimal("100"),
+                quantity_unit=QuantityUnit.g,
+                calories=Decimal("100"),
+                protein_g=Decimal("1"),
+                carbs_g=Decimal("1"),
+                fat_g=Decimal("1"),
+            ),
+        ]
+
+        response = log_meal(db_session, items=items, logged_at=naive, local_tz=dublin_tz)
+
+        # Winter: Europe/Dublin is UTC+0, so the naive wall-clock time maps
+        # 1:1 onto UTC.
+        assert response.logged_at == datetime(2026, 1, 15, 20, 0, tzinfo=UTC)
+
+    def test_naive_logged_at_crosses_dst_transition(
+        self,
+        db_session: Session,
+        dublin_tz: str,
+    ) -> None:
+        def _item() -> MealItemSpec:
+            return MealItemSpec(
+                name="Ad-hoc",
+                quantity=Decimal("100"),
+                quantity_unit=QuantityUnit.g,
+                calories=Decimal("100"),
+                protein_g=Decimal("1"),
+                carbs_g=Decimal("1"),
+                fat_g=Decimal("1"),
+            )
+
+        before_dst = log_meal(
+            db_session,
+            items=[_item()],
+            logged_at=datetime(2026, 3, 1, 12, 0),  # noqa: DTZ001
+            local_tz=dublin_tz,
+        )
+        after_dst = log_meal(
+            db_session,
+            items=[_item()],
+            logged_at=datetime(2026, 4, 1, 12, 0),  # noqa: DTZ001
+            local_tz=dublin_tz,
+        )
+
+        # Pre-transition: UTC+0. Post-transition: UTC+1.
+        assert before_dst.logged_at == datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        assert after_dst.logged_at == datetime(2026, 4, 1, 11, 0, tzinfo=UTC)
