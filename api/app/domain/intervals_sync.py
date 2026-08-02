@@ -25,7 +25,16 @@ from sqlalchemy.orm import Session
 
 from app.db import IntervalsCaloriesOut, IntervalsSource, IntervalsSyncStatus, session_scope
 from app.domain.dto import ManualCaloriesOutResult, SyncIntervalsResult, SyncStatus
-from app.intervals.client import fetch_activity_calories_by_day
+from app.domain.planned_workouts import (
+    FetchActivitiesDetailed,
+    FetchPlannedEvents,
+    sync_planned_workouts,
+)
+from app.intervals.client import (
+    fetch_activities_detailed,
+    fetch_activity_calories_by_day,
+    fetch_planned_events,
+)
 from app.logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,16 +52,31 @@ def sync_intervals(
     to_date: date,
     now: datetime | None = None,
     fetch: FetchCaloriesByDay = fetch_activity_calories_by_day,
+    fetch_activities: FetchActivitiesDetailed = fetch_activities_detailed,
+    fetch_planned: FetchPlannedEvents = fetch_planned_events,
     status_session_factory: StatusSessionFactory = session_scope,
 ) -> SyncIntervalsResult:
     """Sync calories-out for ``[from_date, to_date]`` inclusive.
+
+    Also upserts ``planned_workouts`` rows for the same range (EC-03, §6
+    "Sync changes") via ``sync_planned_workouts`` — one shared function backs
+    all three triggers (cron, the manual sync route, the MCP tool), so
+    extending this function in place, rather than adding a sibling the
+    triggers would each need to call separately, keeps that "one function,
+    three callers" property intact instead of duplicating the wiring three
+    times. Does **not** yet touch ``intervals_calories_out`` or retire the
+    old calories-out fetch (that's EC-07) — the two sync paths run
+    side-by-side in this task.
 
     Raises whatever the fetch callable raises (``IntervalsUnavailableError``
     on upstream failure) — there is nothing to write if the fetch itself
     failed, so that propagates uncaught, and the failure is recorded on the
     status row before re-raising. Per-day write failures instead are caught,
     logged, and recorded in the result so the rest of the range still syncs;
-    the sync as a whole still counts as successful for status purposes.
+    the sync as a whole still counts as successful for status purposes. The
+    same applies to the planned-workouts fetch calls (propagate uncaught,
+    recorded on the status row) and per-row write failures (caught, logged,
+    appended to ``failures``).
 
     ``status_session_factory`` defaults to a fresh, independently-committed
     session (see ``_record_sync_failure``) — tests override it to keep status
@@ -96,6 +120,20 @@ def sync_intervals(
                 failures.append({"date": day.isoformat(), "error": str(exc)})
         day += timedelta(days=1)
 
+    try:
+        workout_result = sync_planned_workouts(
+            session,
+            from_date=from_date,
+            to_date=to_date,
+            now=resolved_now,
+            fetch_activities=fetch_activities,
+            fetch_planned=fetch_planned,
+        )
+    except Exception as exc:
+        _record_sync_failure(status_session_factory, error=str(exc))
+        raise
+    failures.extend(workout_result.failures)
+
     _record_sync_success(status_session_factory, synced_at=resolved_now)
 
     logger.info(
@@ -103,6 +141,7 @@ def sync_intervals(
         from_date=from_date.isoformat(),
         to_date=to_date.isoformat(),
         days_synced=days_synced,
+        workouts_synced=workout_result.workouts_synced,
         failure_count=len(failures),
     )
 

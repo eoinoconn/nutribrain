@@ -43,6 +43,14 @@ def sync(db_session: Session):
     """
 
     def _run(**kwargs):
+        # EC-03 added planned_workouts sync (two more upstream calls) to the
+        # same function. Tests in this file only exercise the calories-out
+        # path, so default the new fetchers to empty results unless a test
+        # explicitly overrides them (see test_intervals_sync_planned_workouts.py) —
+        # otherwise these would default to the real intervals.icu client and
+        # attempt a live HTTP call.
+        kwargs.setdefault("fetch_activities", lambda *, oldest, newest: [])
+        kwargs.setdefault("fetch_planned", lambda *, oldest, newest: [])
         return sync_intervals(
             db_session,
             status_session_factory=lambda: nullcontext(db_session),
