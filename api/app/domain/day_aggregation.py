@@ -13,7 +13,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import Food, IntervalsCaloriesOut, Meal, MealType, Target
+from app.db import Food, Meal, MealType, Target
 from app.domain.dto import (
     DayMealGroup,
     DayResponse,
@@ -24,6 +24,7 @@ from app.domain.dto import (
     RangeResponse,
 )
 from app.domain.nutrition_math import compute_item_macros
+from app.domain.targets import get_effective_target, resolve_calories_out_map
 
 
 def get_day(session: Session, *, day: date) -> DayResponse:
@@ -206,34 +207,13 @@ def _compute_meal_items(
 
 
 def _get_effective_target(session: Session, day: date) -> EffectiveTarget | None:
-    """Compute the effective target for a single day."""
+    """Compute the effective target for a single day.
 
-    target = session.scalar(
-        select(Target)
-        .where(Target.effective_from <= day)
-        .order_by(Target.effective_from.desc())
-        .limit(1)
-    )
-    if target is None:
-        return None
+    Delegates to ``targets.get_effective_target`` (EC-07) so this module has
+    no separate calories_out sourcing to keep in sync with the target panel.
+    """
 
-    cached_out = session.scalar(
-        select(IntervalsCaloriesOut).where(IntervalsCaloriesOut.date == day)
-    )
-    calories_out = cached_out.calories_out if cached_out is not None else None
-    effective_calories = target.base_calories
-    if calories_out is not None:
-        effective_calories += calories_out
-
-    return EffectiveTarget(
-        effective_from=target.effective_from,
-        base_calories=target.base_calories,
-        protein_g=target.protein_g,
-        carbs_g=target.carbs_g,
-        fat_g=target.fat_g,
-        calories_out=calories_out,
-        effective_calories=effective_calories,
-    )
+    return get_effective_target(session, day=day)
 
 
 def _get_effective_targets_for_range(
@@ -243,7 +223,8 @@ def _get_effective_targets_for_range(
 ) -> dict[date, EffectiveTarget]:
     """Batch-load effective targets for a date range in bounded queries.
 
-    Loads all targets and calories_out rows that could apply, then computes
+    Loads all targets and resolves calories_out (EC-07: completed
+    planned_workouts, or a manual override) for the range, then computes
     per-day effective targets in memory.
     """
 
@@ -259,16 +240,7 @@ def _get_effective_targets_for_range(
     if not targets:
         return {}
 
-    # Load all calories_out in the range
-    calories_out_rows = list(
-        session.scalars(
-            select(IntervalsCaloriesOut).where(
-                IntervalsCaloriesOut.date >= from_date,
-                IntervalsCaloriesOut.date <= to_date,
-            )
-        )
-    )
-    calories_out_map = {row.date: row.calories_out for row in calories_out_rows}
+    calories_out_map = resolve_calories_out_map(session, from_date=from_date, to_date=to_date)
 
     # Build per-day targets
     result: dict[date, EffectiveTarget] = {}

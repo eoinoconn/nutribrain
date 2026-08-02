@@ -294,21 +294,20 @@ class TestSyncIntervalsWiresPlannedWorkouts:
             calories=350,
         )
 
-        def fetch_calories(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {}
-
         result = sync_intervals(
             db_session,
             from_date=_FROM,
             to_date=_TO,
             now=_NOW,
-            fetch=fetch_calories,
             fetch_activities=lambda *, oldest, newest: [activity],
             fetch_planned=lambda *, oldest, newest: [event],
             status_session_factory=lambda: nullcontext(db_session),
         )
 
-        assert result.days_synced == 0
+        # EC-07: days_synced now counts planned_workouts rows upserted
+        # (the old calories-out daily-sum path this field used to count is
+        # retired).
+        assert result.days_synced == 2
         planned = _row(
             db_session, source=PlannedWorkoutSource.intervals_planned, external_id="wired-1"
         )
@@ -335,7 +334,6 @@ class TestSyncIntervalsWiresPlannedWorkouts:
                 from_date=_FROM,
                 to_date=_TO,
                 now=_NOW,
-                fetch=lambda *, oldest, newest: {},
                 fetch_activities=lambda *, oldest, newest: [],
                 fetch_planned=failing_fetch_planned,
                 status_session_factory=lambda: nullcontext(db_session),

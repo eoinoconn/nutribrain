@@ -219,9 +219,11 @@ class RangeResponse:
 class SyncIntervalsResult:
     """Result of one sync_intervals invocation (§8, T-061).
 
-    ``days_synced`` counts days actually written (a cached ``0`` counts; a
-    ``null`` day that was skipped does not). ``failures`` holds one entry per
-    day whose write failed, so the rest of the range can still succeed.
+    ``days_synced`` counts ``planned_workouts`` rows upserted (EC-07: the old
+    same-day calories-out sum this field used to count is retired —
+    ``get_effective_target`` derives ``calories_out`` from those rows at read
+    time instead). ``failures`` holds one entry per row whose write failed, so
+    the rest of the range can still succeed.
     """
 
     from_date: date

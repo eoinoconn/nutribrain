@@ -1,12 +1,15 @@
 """Tests for T-061 (sync worker) and T-045 (status + manual override).
 
-Covers the missing-data rules from §8:
-- null from the client writes no row
-- 0 from the client writes a genuine zero
-- a partial failure on one day still syncs the rest of the range
-- a later sync overwrites a manual override and resets source to sync
-
-Also covers the sync status singleton and the manual calories-out override.
+EC-07 retired the old ``fetch_activity_calories_by_day`` daily-sum sync path:
+``sync_intervals`` now only upserts ``planned_workouts`` (via
+``fetch_activities``/``fetch_planned``), and ``calories_out`` is derived from
+those rows at read time by ``targets.get_effective_target`` (see
+``test_targets.py``). This file now covers:
+- a partial failure on one planned-workout row still syncs the rest
+- upstream fetch failure propagates and records sync status
+- the sync status singleton
+- the manual calories-out override write path (``intervals_calories_out``
+  is now written *only* by this path, never by a sync)
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.db import IntervalsCaloriesOut, IntervalsSource
 from app.domain.errors import IntervalsUnavailableError
 from app.domain.intervals_sync import get_sync_status, set_manual_calories_out, sync_intervals
+from app.intervals.client import ActivityDetail, PlannedEventDetail
 
 _FROM = date(2026, 7, 20)
 _TO = date(2026, 7, 22)
@@ -43,12 +47,6 @@ def sync(db_session: Session):
     """
 
     def _run(**kwargs):
-        # EC-03 added planned_workouts sync (two more upstream calls) to the
-        # same function. Tests in this file only exercise the calories-out
-        # path, so default the new fetchers to empty results unless a test
-        # explicitly overrides them (see test_intervals_sync_planned_workouts.py) —
-        # otherwise these would default to the real intervals.icu client and
-        # attempt a live HTTP call.
         kwargs.setdefault("fetch_activities", lambda *, oldest, newest: [])
         kwargs.setdefault("fetch_planned", lambda *, oldest, newest: [])
         return sync_intervals(
@@ -60,91 +58,39 @@ def sync(db_session: Session):
     return _run
 
 
-class TestSyncIntervalsMissingDataRules:
-    def test_null_day_writes_no_row(self, db_session: Session, sync) -> None:
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {date(2026, 7, 20): None, date(2026, 7, 21): 500, date(2026, 7, 22): None}
-
-        result = sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=fetch)
-
-        assert result.days_synced == 1
-        assert _cache_row(db_session, date(2026, 7, 20)) is None
-        assert _cache_row(db_session, date(2026, 7, 22)) is None
-
-    def test_zero_day_writes_a_genuine_zero(self, db_session: Session, sync) -> None:
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {date(2026, 7, 20): 0, date(2026, 7, 21): 300, date(2026, 7, 22): None}
-
-        result = sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=fetch)
-
-        assert result.days_synced == 2
-        row = _cache_row(db_session, date(2026, 7, 20))
-        assert row is not None
-        assert row.calories_out == 0
-        assert row.source == IntervalsSource.sync
-        assert row.fetched_at == _NOW
-
-    def test_day_absent_from_fetch_result_writes_no_row(self, db_session: Session, sync) -> None:
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {date(2026, 7, 21): 400}
-
-        result = sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=fetch)
-
-        assert result.days_synced == 1
-        assert _cache_row(db_session, date(2026, 7, 20)) is None
-        assert _cache_row(db_session, date(2026, 7, 22)) is None
-
-
 class TestSyncIntervalsPartialFailure:
-    def test_one_bad_day_does_not_block_the_rest(self, db_session: Session, sync) -> None:
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {
-                date(2026, 7, 20): 100,
-                date(2026, 7, 21): "not-a-number",  # type: ignore[dict-item]
-                date(2026, 7, 22): 300,
-            }
+    def test_one_bad_activity_does_not_block_the_rest(self, db_session: Session, sync) -> None:
+        good = ActivityDetail(
+            external_id="a-good",
+            start_date_local="2026-07-20T06:00:00",
+            duration_minutes=45.0,
+            sport_type="Ride",
+            calories=300,
+        )
+        # A missing start date fails row parsing/validation inside the upsert.
+        bad = ActivityDetail(
+            external_id="a-bad",
+            start_date_local="not-a-date",
+            duration_minutes=45.0,
+            sport_type="Ride",
+            calories=100,
+        )
 
-        result = sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=fetch)
+        def fetch_activities(*, oldest: date, newest: date) -> list[ActivityDetail]:
+            return [good, bad]
 
-        assert result.days_synced == 2
+        result = sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch_activities=fetch_activities)
+
+        assert result.days_synced == 1
         assert len(result.failures) == 1
-        assert result.failures[0]["date"] == "2026-07-21"
-        assert _cache_row(db_session, date(2026, 7, 20)) is not None
-        assert _cache_row(db_session, date(2026, 7, 21)) is None
-        assert _cache_row(db_session, date(2026, 7, 22)) is not None
+        assert result.failures[0]["external_id"] == "a-bad"
 
     def test_upstream_fetch_failure_propagates(self, db_session: Session, sync) -> None:
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
+        def fetch_activities(*, oldest: date, newest: date) -> list[ActivityDetail]:
             raise IntervalsUnavailableError("intervals.icu sync failed.")
 
         with pytest.raises(IntervalsUnavailableError):
-            sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=fetch)
-
-
-class TestSyncIntervalsManualOverride:
-    def test_later_sync_replaces_manual_override(self, db_session: Session, sync) -> None:
-        manual_day = date(2026, 7, 21)
-        db_session.add(
-            IntervalsCaloriesOut(
-                date=manual_day,
-                calories_out=999,
-                fetched_at=datetime(2026, 7, 20, 8, 0, tzinfo=UTC),
-                source=IntervalsSource.manual,
-            )
-        )
-        db_session.flush()
-
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {manual_day: 450}
-
-        result = sync(from_date=manual_day, to_date=manual_day, now=_NOW, fetch=fetch)
-
-        assert result.days_synced == 1
-        row = _cache_row(db_session, manual_day)
-        assert row is not None
-        assert row.calories_out == 450
-        assert row.source == IntervalsSource.sync
-        assert row.fetched_at == _NOW
+            sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch_activities=fetch_activities)
 
 
 class TestSyncStatus:
@@ -156,31 +102,39 @@ class TestSyncStatus:
     def test_successful_sync_records_last_synced_at_and_clears_error(
         self, db_session: Session, sync
     ) -> None:
-        def failing_fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
+        def failing_fetch_planned(*, oldest: date, newest: date) -> list[PlannedEventDetail]:
             raise IntervalsUnavailableError("intervals.icu sync failed.")
 
         with pytest.raises(IntervalsUnavailableError):
-            sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=failing_fetch)
+            sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch_planned=failing_fetch_planned)
 
         status = get_sync_status(db_session)
         assert status.last_error == "intervals.icu sync failed."
 
-        def ok_fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
-            return {date(2026, 7, 21): 300}
+        def ok_fetch_planned(*, oldest: date, newest: date) -> list[PlannedEventDetail]:
+            return [
+                PlannedEventDetail(
+                    external_id="e1",
+                    start_date_local="2026-07-21T06:00:00",
+                    duration_minutes=60.0,
+                    sport_type="Run",
+                    icu_joules=None,
+                )
+            ]
 
         later = datetime(2026, 7, 26, 13, 0, tzinfo=UTC)
-        sync(from_date=_FROM, to_date=_TO, now=later, fetch=ok_fetch)
+        sync(from_date=_FROM, to_date=_TO, now=later, fetch_planned=ok_fetch_planned)
 
         status = get_sync_status(db_session)
         assert status.last_synced_at == later
         assert status.last_error is None
 
     def test_upstream_failure_records_last_error(self, db_session: Session, sync) -> None:
-        def fetch(*, oldest: date, newest: date) -> dict[date, int | None]:
+        def fetch_activities(*, oldest: date, newest: date) -> list[ActivityDetail]:
             raise IntervalsUnavailableError("intervals.icu sync failed with status 401.")
 
         with pytest.raises(IntervalsUnavailableError):
-            sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch=fetch)
+            sync(from_date=_FROM, to_date=_TO, now=_NOW, fetch_activities=fetch_activities)
 
         status = get_sync_status(db_session)
         assert status.last_synced_at is None
@@ -199,14 +153,14 @@ class TestSetManualCaloriesOut:
         assert row.calories_out == 600
         assert row.fetched_at == _NOW
 
-    def test_overwrites_an_existing_synced_row(self, db_session: Session) -> None:
+    def test_overwrites_an_existing_manual_row(self, db_session: Session) -> None:
         day = date(2026, 7, 23)
         db_session.add(
             IntervalsCaloriesOut(
                 date=day,
                 calories_out=100,
                 fetched_at=datetime(2026, 7, 22, 6, 0, tzinfo=UTC),
-                source=IntervalsSource.sync,
+                source=IntervalsSource.manual,
             )
         )
         db_session.flush()
