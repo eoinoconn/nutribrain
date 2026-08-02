@@ -68,11 +68,11 @@ function TokenPasteScreen({ onSubmit, invalidMessage }: TokenPasteScreenProps): 
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 p-6 shadow-sm dark:border-slate-800">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-4 text-ink-primary dark:bg-canvas-dark dark:text-ink-primary-dark">
+      <div className="w-full max-w-sm space-y-4 rounded-lg border border-line p-6 shadow-sm dark:border-line-dark">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">NutriBrain</h1>
-          <p className="text-sm text-slate-700 dark:text-slate-300">Paste your API token to continue.</p>
+          <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">Paste your API token to continue.</p>
         </div>
 
         {invalidMessage ? (
@@ -95,7 +95,7 @@ function TokenPasteScreen({ onSubmit, invalidMessage }: TokenPasteScreenProps): 
               type="password"
               autoComplete="off"
               spellCheck={false}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900"
+              className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent dark:border-line-dark dark:bg-canvas-dark"
               value={value}
               onChange={(event) => setValue(event.target.value)}
               aria-invalid={showRequiredError}
@@ -110,7 +110,7 @@ function TokenPasteScreen({ onSubmit, invalidMessage }: TokenPasteScreenProps): 
 
           <button
             type="submit"
-            className="w-full rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+            className="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
           >
             Continue
           </button>

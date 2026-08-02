@@ -63,13 +63,13 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
   };
 
   return (
-    <fieldset className="rounded-lg border border-slate-300 p-4 dark:border-slate-700">
-      <legend className="px-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Item {index + 1}</legend>
+    <fieldset className="rounded-lg border border-line p-4 dark:border-line-dark">
+      <legend className="px-1 text-sm font-semibold text-ink-secondary dark:text-ink-secondary-dark">Item {index + 1}</legend>
 
       <div className="flex flex-wrap items-end gap-3">
         {item.isAdHoc ? (
           <div className="flex-1">
-            <label htmlFor={nameId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={nameId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Name (item {index + 1})
             </label>
             <input
@@ -78,7 +78,7 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               value={item.name}
               onChange={(event) => onChange({ ...item, name: event.target.value })}
               placeholder="e.g. Homemade soup"
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
         ) : (
@@ -86,7 +86,7 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
         )}
 
         <div className="w-28">
-          <label htmlFor={quantityId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={quantityId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Quantity
           </label>
           <input
@@ -95,19 +95,19 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
             inputMode="decimal"
             value={numericFieldValue(item.quantity)}
             onChange={(event) => onChange({ ...item, quantity: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
 
         <div className="w-32">
-          <label htmlFor={unitId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={unitId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Unit
           </label>
           <select
             id={unitId}
             value={item.quantityUnit}
             onChange={(event) => onChange({ ...item, quantityUnit: event.target.value as MealEditorItem["quantityUnit"] })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           >
             {QUANTITY_UNITS.map((unit) => (
               <option key={unit} value={unit}>
@@ -125,7 +125,7 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
             onChange={handleToggleAdHoc}
             className="focus-ring h-4 w-4"
           />
-          <label htmlFor={adHocToggleId} className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={adHocToggleId} className="text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Ad-hoc (enter macros manually)
           </label>
         </div>
@@ -134,7 +134,7 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
           type="button"
           onClick={onRemove}
           disabled={!canRemove}
-          className="focus-ring ml-auto rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="focus-ring ml-auto rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50 dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
         >
           Remove item {index + 1}
         </button>
@@ -143,7 +143,7 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
       {item.isAdHoc ? (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label htmlFor={caloriesId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={caloriesId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Calories
             </label>
             <input
@@ -152,11 +152,11 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.calories)}
               onChange={(event) => onChange({ ...item, calories: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={proteinId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={proteinId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Protein (g)
             </label>
             <input
@@ -165,11 +165,11 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.proteinG)}
               onChange={(event) => onChange({ ...item, proteinG: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={carbsId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={carbsId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Carbs (g)
             </label>
             <input
@@ -178,11 +178,11 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.carbsG)}
               onChange={(event) => onChange({ ...item, carbsG: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={fatId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={fatId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Fat (g)
             </label>
             <input
@@ -191,11 +191,11 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.fatG)}
               onChange={(event) => onChange({ ...item, fatG: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={fiberId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={fiberId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Fiber (g)
             </label>
             <input
@@ -204,11 +204,11 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.fiberG)}
               onChange={(event) => onChange({ ...item, fiberG: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={satFatId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={satFatId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Sat. fat (g)
             </label>
             <input
@@ -217,11 +217,11 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.satFatG)}
               onChange={(event) => onChange({ ...item, satFatG: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
           <div>
-            <label htmlFor={sodiumId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label htmlFor={sodiumId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
               Sodium (mg)
             </label>
             <input
@@ -230,7 +230,7 @@ export default function MealItemRow({ item, index, onChange, onRemove, canRemove
               inputMode="decimal"
               value={numericFieldValue(item.sodiumMg)}
               onChange={(event) => onChange({ ...item, sodiumMg: parseNumericInput(event.target.value) })}
-              className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
             />
           </div>
         </div>

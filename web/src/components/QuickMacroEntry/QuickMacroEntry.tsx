@@ -64,14 +64,14 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
     <form className="space-y-4" aria-label="Log macros">
       <div className="flex flex-wrap gap-4">
         <div>
-          <label htmlFor={mealTypeId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={mealTypeId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Meal type
           </label>
           <select
             id={mealTypeId}
             value={value.mealType}
             onChange={(event) => update({ mealType: event.target.value as MealType })}
-            className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           >
             {MEAL_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -82,7 +82,7 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
         </div>
 
         <div>
-          <label htmlFor={timeId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={timeId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Time
           </label>
           <input
@@ -90,12 +90,12 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             type="time"
             value={value.time}
             onChange={(event) => update({ time: event.target.value })}
-            className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
 
         <div className="flex-1">
-          <label htmlFor={nameId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={nameId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Name (optional)
           </label>
           <input
@@ -104,14 +104,14 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             value={value.name}
             onChange={(event) => update({ name: event.target.value })}
             placeholder="Quick entry"
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
-          <label htmlFor={caloriesId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={caloriesId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Calories
           </label>
           <input
@@ -120,11 +120,11 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.calories)}
             onChange={(event) => update({ calories: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={proteinId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={proteinId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Protein (g)
           </label>
           <input
@@ -133,11 +133,11 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.proteinG)}
             onChange={(event) => update({ proteinG: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={carbsId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={carbsId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Carbs (g)
           </label>
           <input
@@ -146,11 +146,11 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.carbsG)}
             onChange={(event) => update({ carbsG: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={fatId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={fatId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Fat (g)
           </label>
           <input
@@ -159,11 +159,11 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.fatG)}
             onChange={(event) => update({ fatG: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={fiberId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={fiberId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Fiber (g)
           </label>
           <input
@@ -172,11 +172,11 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.fiberG)}
             onChange={(event) => update({ fiberG: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={satFatId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={satFatId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Sat. fat (g)
           </label>
           <input
@@ -185,11 +185,11 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.satFatG)}
             onChange={(event) => update({ satFatG: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={sodiumId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={sodiumId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Sodium (mg)
           </label>
           <input
@@ -198,7 +198,7 @@ export default function QuickMacroEntry({ onChange, now }: QuickMacroEntryProps)
             inputMode="decimal"
             value={numericFieldValue(value.sodiumMg)}
             onChange={(event) => update({ sodiumMg: parseNumericInput(event.target.value) })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
       </div>

@@ -93,19 +93,19 @@ export default function Sidebar(): JSX.Element {
     <nav
       aria-label="Primary"
       className={
-        "flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-800 dark:bg-slate-950 md:sticky md:top-0 md:h-screen md:flex-col md:gap-1 md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:p-3" +
+        "flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-canvas p-2 text-sm dark:border-line-dark dark:bg-canvas-dark md:sticky md:top-0 md:h-screen md:flex-col md:gap-1 md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:p-3" +
         (collapsed ? " md:w-16" : " md:w-56")
       }
     >
       <div className="hidden shrink-0 items-center justify-between md:flex">
         {collapsed ? null : (
-          <span className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <span className="px-2 text-xs font-semibold uppercase tracking-wide text-ink-tertiary dark:text-ink-secondary-dark">
             NutriBrain
           </span>
         )}
         <button
           type="button"
-          className="focus-ring rounded-md p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md p-2 text-ink-secondary hover:bg-line dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
           aria-expanded={!collapsed}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           onClick={() => setCollapsed((current) => !current)}
@@ -125,8 +125,8 @@ export default function Sidebar(): JSX.Element {
             className={
               "focus-ring flex shrink-0 items-center gap-3 whitespace-nowrap rounded-md border-b-4 border-l-0 px-2 py-2 md:border-b-0 md:border-l-4" +
               (active
-                ? " bg-sky-100 font-medium text-sky-900 dark:bg-sky-950 dark:text-sky-100 border-sky-500 md:border-l-sky-500"
-                : " border-transparent text-slate-700 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800")
+                ? " bg-accent-soft font-medium text-accent dark:bg-accent-soft-dark dark:text-ink-primary-dark border-accent md:border-l-accent"
+                : " border-transparent text-ink-secondary hover:bg-line dark:text-ink-secondary-dark dark:hover:bg-panel-dark")
             }
           >
             <item.icon className="h-5 w-5 shrink-0" />

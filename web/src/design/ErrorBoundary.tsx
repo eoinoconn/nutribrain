@@ -46,10 +46,10 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       return (
         <section
           role="alert"
-          className="mx-auto max-w-lg space-y-4 rounded-lg border border-red-300 bg-white p-6 text-center shadow-sm dark:border-red-800 dark:bg-slate-900"
+          className="mx-auto max-w-lg space-y-4 rounded-lg border border-red-300 bg-white p-6 text-center shadow-sm dark:border-red-800 dark:bg-canvas-dark"
         >
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Something went wrong</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <h1 className="text-xl font-semibold text-ink-primary dark:text-ink-primary-dark">Something went wrong</h1>
+          <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
             This page hit an unexpected error and couldn&apos;t render. Your data is safe &mdash; nothing was
             saved from this broken state.
           </p>
@@ -57,14 +57,14 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             <button
               type="button"
               onClick={this.handleReset}
-              className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+              className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent"
             >
               Try again
             </button>
             <button
               type="button"
               onClick={() => window.location.assign("/")}
-              className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+              className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
             >
               Go to Today
             </button>

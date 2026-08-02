@@ -79,7 +79,7 @@ export default function Modal({ isOpen, onClose, titleId, children }: ModalProps
     // isn't meant to be treated as an interactive control by assistive tech.
     <div
       role="presentation"
-      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 px-4 py-8"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-canvas-dark/50 px-4 py-8"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -92,7 +92,7 @@ export default function Modal({ isOpen, onClose, titleId, children }: ModalProps
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="focus-ring max-h-full w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900"
+        className="focus-ring max-h-full w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-canvas-dark"
       >
         {children}
       </div>

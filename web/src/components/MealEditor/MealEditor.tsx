@@ -89,14 +89,14 @@ export default function MealEditor({
     <form className="space-y-4" aria-label="Meal editor">
       <div className="flex flex-wrap gap-4">
         <div>
-          <label htmlFor={mealTypeId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={mealTypeId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Meal type
           </label>
           <select
             id={mealTypeId}
             value={mealType}
             onChange={(event) => handleMealTypeChange(event.target.value as MealType)}
-            className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           >
             {MEAL_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -107,7 +107,7 @@ export default function MealEditor({
         </div>
 
         <div>
-          <label htmlFor={timeId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={timeId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Time
           </label>
           <input
@@ -115,7 +115,7 @@ export default function MealEditor({
             type="time"
             value={time}
             onChange={(event) => handleTimeChange(event.target.value)}
-            className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
       </div>
@@ -136,7 +136,7 @@ export default function MealEditor({
       <button
         type="button"
         onClick={handleAddItem}
-        className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
       >
         Add item
       </button>

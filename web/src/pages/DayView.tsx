@@ -409,7 +409,7 @@ export default function DayView(): JSX.Element {
         <button
           type="button"
           onClick={() => void dayQuery.refetch()}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
         >
           Retry
         </button>
@@ -442,7 +442,7 @@ export default function DayView(): JSX.Element {
             onClick={handleToggleCaloriesOut}
             aria-expanded={isCaloriesOutOpen}
             aria-controls="calories-out-panel"
-            className="focus-ring shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="focus-ring shrink-0 rounded-md border border-line px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
           >
             {isCaloriesOutOpen ? "Close" : "Calories out"}
           </button>
@@ -469,7 +469,7 @@ export default function DayView(): JSX.Element {
           type="button"
           onClick={handleToggleEditor}
           aria-expanded={isEditorOpen}
-          className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+          className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent dark:bg-accent-dark dark:text-ink-primary dark:hover:bg-accent-dark"
         >
           {isEditorOpen ? "Cancel" : "Log a meal"}
         </button>
@@ -477,7 +477,7 @@ export default function DayView(): JSX.Element {
           type="button"
           onClick={handleToggleQuickMacro}
           aria-expanded={isQuickMacroOpen}
-          className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
         >
           {isQuickMacroOpen ? "Cancel" : "Log macros"}
         </button>
@@ -486,7 +486,7 @@ export default function DayView(): JSX.Element {
             type="button"
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:hover:bg-panel-dark"
           >
             {syncMutation.isPending ? "Syncing..." : "Sync intervals now"}
           </button>
@@ -494,13 +494,13 @@ export default function DayView(): JSX.Element {
       </div>
 
       {isEditorOpen ? (
-        <div className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <div className="space-y-4 rounded-lg border border-line p-4 dark:border-line-dark">
           <MealEditor onChange={setEditorValue} />
           <button
             type="button"
             onClick={handleSubmitMeal}
             disabled={logMealMutation.isPending}
-            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent dark:bg-accent-dark dark:text-ink-primary dark:hover:bg-accent-dark disabled:opacity-50"
           >
             {logMealMutation.isPending ? "Saving..." : "Save meal"}
           </button>
@@ -508,13 +508,13 @@ export default function DayView(): JSX.Element {
       ) : null}
 
       {isQuickMacroOpen ? (
-        <div className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <div className="space-y-4 rounded-lg border border-line p-4 dark:border-line-dark">
           <QuickMacroEntry onChange={setQuickMacroValue} />
           <button
             type="button"
             onClick={handleSubmitQuickMacro}
             disabled={logMacrosMutation.isPending}
-            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent dark:bg-accent-dark dark:text-ink-primary dark:hover:bg-accent-dark disabled:opacity-50"
           >
             {logMacrosMutation.isPending ? "Saving..." : "Save macros"}
           </button>
@@ -526,7 +526,7 @@ export default function DayView(): JSX.Element {
           {flatMealGroups.map(({ mealType, group }) => {
             const isOpen = expanded[group.id] ?? false;
             return (
-              <div key={group.id} className="rounded-lg border border-slate-200 dark:border-slate-800">
+              <div key={group.id} className="rounded-lg border border-line dark:border-line-dark">
                 <div className="flex items-center gap-2 px-4 py-3">
                   <button
                     type="button"
@@ -535,13 +535,13 @@ export default function DayView(): JSX.Element {
                     className="focus-ring flex flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-left"
                   >
                     <span className="flex items-center gap-3">
-                      <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-500">
+                      <span className="text-xs font-medium uppercase tracking-wide text-ink-tertiary dark:text-ink-tertiary-dark">
                         {new Date(group.loggedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                       <span className="font-medium">{MEAL_TYPE_LABELS[mealType] ?? mealType}</span>
                     </span>
-                    <span className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                    <span className="flex items-center gap-4 text-sm text-ink-tertiary dark:text-ink-secondary-dark">
+                      <span className="font-medium text-accent dark:text-accent-dark">
                         {formatCalories(group.totals.calories)} cal
                       </span>
                       <span>P {formatGrams(group.totals.proteinG)}g</span>
@@ -549,7 +549,7 @@ export default function DayView(): JSX.Element {
                       <span>F {formatGrams(group.totals.fatG)}g</span>
                       <span
                         aria-hidden="true"
-                        className={`inline-block transition-transform ${isOpen ? "rotate-90 text-sky-600" : "text-slate-400"}`}
+                        className={`inline-block transition-transform ${isOpen ? "rotate-90 text-accent" : "text-ink-secondary-dark"}`}
                       >
                         &#8250;
                       </span>
@@ -559,18 +559,18 @@ export default function DayView(): JSX.Element {
                     type="button"
                     onClick={() => deleteMealMutation.mutate(group.id)}
                     disabled={deleteMealMutation.isPending}
-                    className="focus-ring shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="focus-ring shrink-0 rounded-md border border-line px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
                   >
                     Delete meal
                   </button>
                 </div>
                 {isOpen ? (
-                  <div className="space-y-2 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                  <div className="space-y-2 border-t border-line px-4 py-3 dark:border-line-dark">
                     <ul className="space-y-2 text-sm">
                       {group.items.map((item) => (
                         <li key={item.id} className="space-y-2">
                           {editingItemId === item.id && editingItemValue ? (
-                            <div className="space-y-2 rounded-md border border-sky-300 p-3 dark:border-sky-700">
+                            <div className="space-y-2 rounded-md border border-accent-dark p-3 dark:border-accent">
                               <MealItemRow
                                 item={editingItemValue}
                                 index={0}
@@ -583,14 +583,14 @@ export default function DayView(): JSX.Element {
                                   type="button"
                                   onClick={() => handleSaveEditItem(mealType, group.loggedAt)}
                                   disabled={editMealItemMutation.isPending}
-                                  className="focus-ring rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                                  className="focus-ring rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent dark:bg-accent-dark dark:text-ink-primary dark:hover:bg-accent-dark disabled:opacity-50"
                                 >
                                   {editMealItemMutation.isPending ? "Saving..." : "Save item"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={handleCancelEditItem}
-                                  className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
                                 >
                                   Cancel
                                 </button>
@@ -600,27 +600,27 @@ export default function DayView(): JSX.Element {
                             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                               <span className="flex items-baseline gap-2">
                                 <span>{item.name}</span>
-                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="text-xs text-ink-tertiary dark:text-ink-secondary-dark">
                                   {formatGrams(item.quantity)} {item.quantityUnit}
                                 </span>
                               </span>
                               <div className="flex items-center gap-3">
-                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="text-xs text-ink-tertiary dark:text-ink-secondary-dark">
                                   P {formatGrams(item.macros.proteinG)}g
                                 </span>
-                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="text-xs text-ink-tertiary dark:text-ink-secondary-dark">
                                   C {formatGrams(item.macros.carbsG)}g
                                 </span>
-                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="text-xs text-ink-tertiary dark:text-ink-secondary-dark">
                                   F {formatGrams(item.macros.fatG)}g
                                 </span>
-                                <span className="text-slate-500 dark:text-slate-400">
+                                <span className="text-ink-tertiary dark:text-ink-secondary-dark">
                                   {formatCalories(item.macros.calories)} cal
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleStartEditItem(item.id, mealItemToEditorItem(item))}
-                                  className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  className="focus-ring rounded-md border border-line px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
                                 >
                                   Edit
                                 </button>
@@ -628,7 +628,7 @@ export default function DayView(): JSX.Element {
                                   type="button"
                                   onClick={() => deleteMealItemMutation.mutate(item.id)}
                                   disabled={deleteMealItemMutation.isPending}
-                                  className="focus-ring rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  className="focus-ring rounded-md border border-line px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
                                 >
                                   Delete
                                 </button>
@@ -673,11 +673,11 @@ function ManualCaloriesOutForm({
       onSubmit={onSubmit}
       noValidate
       aria-label="Manual calories-out override"
-      className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800"
+      className="space-y-2 rounded-lg border border-line p-4 dark:border-line-dark"
     >
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor="manual-calories-out" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor="manual-calories-out" className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Calories out (manual)
           </label>
           <input
@@ -687,18 +687,18 @@ function ManualCaloriesOutForm({
             min={0}
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            className="focus-ring w-32 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-32 rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <button
           type="submit"
           disabled={isPending}
-          className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:hover:bg-panel-dark"
         >
           {isPending ? "Saving..." : "Set"}
         </button>
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-xs text-ink-tertiary dark:text-ink-secondary-dark">
         {currentCaloriesOut !== null
           ? `Current: ${formatCalories(currentCaloriesOut)} cal. Use this only when Intervals/Garmin didn't sync for this day — the next real sync overwrites it.`
           : "Use this only when Intervals/Garmin didn't sync for this day — the next real sync overwrites it."}

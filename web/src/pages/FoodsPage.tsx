@@ -406,7 +406,7 @@ export default function FoodsPage(): JSX.Element {
         <button
           type="button"
           onClick={() => void foodsQuery.refetch()}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
         >
           Retry
         </button>
@@ -423,14 +423,14 @@ export default function FoodsPage(): JSX.Element {
         <button
           type="button"
           onClick={handleOpenAdd}
-          className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+          className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent"
         >
           Add food
         </button>
       </div>
 
       <div>
-        <label htmlFor="foods-search" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor="foods-search" className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
           Search foods
         </label>
         <input
@@ -439,7 +439,7 @@ export default function FoodsPage(): JSX.Element {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="e.g. chicken"
-          className="focus-ring w-full max-w-sm rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="focus-ring w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
         />
       </div>
 
@@ -450,9 +450,9 @@ export default function FoodsPage(): JSX.Element {
           action={{ label: "Add food", onClick: handleOpenAdd }}
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+        <div className="overflow-x-auto rounded-lg border border-line dark:border-line-dark">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-tertiary dark:border-line-dark dark:text-ink-secondary-dark">
               <tr>
                 <SortableHeader label="Favorite" column="isFavorite" active={sortColumn} direction={sortDirection} onSort={handleSort} />
                 <SortableHeader label="Name" column="name" active={sortColumn} direction={sortDirection} onSort={handleSort} />
@@ -464,7 +464,7 @@ export default function FoodsPage(): JSX.Element {
             </thead>
             <tbody>
               {sortedFoods.map((food) => (
-                <tr key={food.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800/60">
+                <tr key={food.id} className="border-b border-line last:border-0 dark:border-line-dark/60">
                   <td className="px-3 py-2">
                     <button
                       type="button"
@@ -472,7 +472,7 @@ export default function FoodsPage(): JSX.Element {
                       disabled={favoriteMutation.isPending}
                       aria-pressed={food.isFavorite}
                       aria-label={food.isFavorite ? `Remove ${food.name} from favorites` : `Add ${food.name} to favorites`}
-                      className="focus-ring rounded-md px-2 py-1 text-lg text-amber-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
+                      className="focus-ring rounded-md px-2 py-1 text-lg text-amber-500 hover:bg-canvas disabled:opacity-50 dark:hover:bg-panel-dark"
                     >
                       {food.isFavorite ? "★" : "☆"}
                     </button>
@@ -481,7 +481,7 @@ export default function FoodsPage(): JSX.Element {
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(food)}
-                      className="focus-ring rounded-md text-left font-medium text-sky-700 hover:underline dark:text-sky-400"
+                      className="focus-ring rounded-md text-left font-medium text-accent hover:underline dark:text-accent-dark"
                     >
                       {food.name}
                     </button>
@@ -564,7 +564,7 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
   return (
     <>
       <div>
-        <label htmlFor={`${idPrefix}-name`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor={`${idPrefix}-name`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
           Name
         </label>
         <input
@@ -572,13 +572,13 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
           type="text"
           value={values.name}
           onChange={(event) => onChange({ ...values, name: event.target.value })}
-          className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+          className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor={`${idPrefix}-serving-size`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-serving-size`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Serving size
           </label>
           <input
@@ -587,11 +587,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.servingSize}
             onChange={(event) => onChange({ ...values, servingSize: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-serving-unit`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-serving-unit`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Serving unit
           </label>
           <select
@@ -599,7 +599,7 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             value={values.servingUnit}
             disabled={servingUnitDisabled}
             onChange={(event) => onChange({ ...values, servingUnit: event.target.value as ServingUnit })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-line-dark dark:bg-canvas-dark"
           >
             {SERVING_UNITS.map((unit) => (
               <option key={unit} value={unit}>
@@ -608,7 +608,7 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             ))}
           </select>
           {servingUnitDisabled ? (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-ink-tertiary dark:text-ink-secondary-dark">
               Can&apos;t be changed after creation &mdash; add a new food instead.
             </p>
           ) : null}
@@ -617,7 +617,7 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
-          <label htmlFor={`${idPrefix}-calories`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-calories`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Calories
           </label>
           <input
@@ -626,11 +626,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.calories}
             onChange={(event) => onChange({ ...values, calories: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-protein`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-protein`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Protein (g)
           </label>
           <input
@@ -639,11 +639,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.proteinG}
             onChange={(event) => onChange({ ...values, proteinG: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-carbs`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-carbs`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Carbs (g)
           </label>
           <input
@@ -652,11 +652,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.carbsG}
             onChange={(event) => onChange({ ...values, carbsG: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-fat`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-fat`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Fat (g)
           </label>
           <input
@@ -665,11 +665,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.fatG}
             onChange={(event) => onChange({ ...values, fatG: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-fiber`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-fiber`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Fiber (g)
           </label>
           <input
@@ -678,11 +678,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.fiberG}
             onChange={(event) => onChange({ ...values, fiberG: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-sat-fat`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-sat-fat`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Sat. fat (g)
           </label>
           <input
@@ -691,11 +691,11 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.satFatG}
             onChange={(event) => onChange({ ...values, satFatG: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
         <div>
-          <label htmlFor={`${idPrefix}-sodium`} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={`${idPrefix}-sodium`} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Sodium (mg)
           </label>
           <input
@@ -704,7 +704,7 @@ function NutritionFields({ values, onChange, servingUnitDisabled, idPrefix }: Nu
             inputMode="decimal"
             value={values.sodiumMg}
             onChange={(event) => onChange({ ...values, sodiumMg: event.target.value })}
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
       </div>
@@ -735,7 +735,7 @@ function EditFoodModal({
       <h2 id={titleId} className="mb-1 text-lg font-semibold">
         Edit {food.name}
       </h2>
-      <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+      <p className="mb-4 text-sm text-ink-secondary dark:text-ink-secondary-dark">
         Saving changes to calories, protein, carbs, fat, fiber, sat. fat, sodium, or serving size
         recomputes every past meal logged with this food (read-time calculation, no data is
         rewritten). This food has been logged in {food.loggedCount} meal item
@@ -753,14 +753,14 @@ function EditFoodModal({
           <button
             type="button"
             onClick={onClose}
-            className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isPending}
-            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             {isPending ? "Saving..." : "Save changes"}
           </button>
@@ -825,14 +825,14 @@ function AddFoodModal({
           <button
             type="button"
             onClick={onClose}
-            className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isPending}
-            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             {isPending ? "Adding..." : "Add food"}
           </button>

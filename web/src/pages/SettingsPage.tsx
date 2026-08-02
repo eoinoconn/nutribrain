@@ -113,13 +113,13 @@ function TokenSection(): JSX.Element {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+    <div className="space-y-3 rounded-lg border border-line p-4 dark:border-line-dark">
       <h3 className="text-lg font-medium">API token</h3>
 
       {currentToken ? (
-        <p className="font-mono text-sm text-slate-700 dark:text-slate-300">{maskToken(currentToken)}</p>
+        <p className="font-mono text-sm text-ink-secondary dark:text-ink-secondary-dark">{maskToken(currentToken)}</p>
       ) : (
-        <p className="text-sm text-slate-700 dark:text-slate-300">No token stored.</p>
+        <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">No token stored.</p>
       )}
 
       <div className="flex flex-wrap gap-2">
@@ -127,7 +127,7 @@ function TokenSection(): JSX.Element {
           type="button"
           onClick={() => void handleCopy()}
           disabled={!currentToken}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:hover:bg-panel-dark"
         >
           Copy
         </button>
@@ -135,7 +135,7 @@ function TokenSection(): JSX.Element {
           type="button"
           onClick={() => setRotating((prev) => !prev)}
           aria-expanded={rotating}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
         >
           Rotate token
         </button>
@@ -143,7 +143,7 @@ function TokenSection(): JSX.Element {
           type="button"
           onClick={() => void handleTestConnection()}
           disabled={connection.status === "testing"}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:hover:bg-panel-dark"
         >
           {connection.status === "testing" ? "Testing..." : "Test connection"}
         </button>
@@ -179,11 +179,11 @@ function TokenSection(): JSX.Element {
             spellCheck={false}
             value={rotateValue}
             onChange={(event) => setRotateValue(event.target.value)}
-            className="focus-ring w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full max-w-sm rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
           <button
             type="submit"
-            className="focus-ring rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700"
+            className="focus-ring rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent"
           >
             Save new token
           </button>
@@ -204,9 +204,9 @@ function TimezoneSection(): JSX.Element {
   }, [timezone]);
 
   return (
-    <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+    <div className="space-y-2 rounded-lg border border-line p-4 dark:border-line-dark">
       <h3 className="text-lg font-medium">Timezone</h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
         Defaults to your browser timezone ({browserTimezone}). Stored locally only for now &mdash; no
         backend field exists yet to persist a timezone override.
       </p>
@@ -218,7 +218,7 @@ function TimezoneSection(): JSX.Element {
         type="text"
         value={timezone}
         onChange={(event) => setTimezone(event.target.value)}
-        className="focus-ring w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="focus-ring w-full max-w-sm rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
       />
     </div>
   );
@@ -251,7 +251,7 @@ function SyncStatusSection(): JSX.Element {
   });
 
   return (
-    <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+    <div className="space-y-2 rounded-lg border border-line p-4 dark:border-line-dark">
       <h3 className="text-lg font-medium">Intervals sync</h3>
       {statusQuery.isLoading ? (
         <Skeleton className="h-5 w-48" label="Loading sync status" />
@@ -260,7 +260,7 @@ function SyncStatusSection(): JSX.Element {
           Could not load sync status.
         </p>
       ) : (
-        <p className="text-sm text-slate-700 dark:text-slate-300">
+        <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
           Last synced: {statusQuery.data?.lastSyncedAt ?? "never"}
         </p>
       )}
@@ -268,7 +268,7 @@ function SyncStatusSection(): JSX.Element {
         type="button"
         onClick={() => syncMutation.mutate()}
         disabled={syncMutation.isPending}
-        className="focus-ring rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800"
+        className="focus-ring rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:hover:bg-panel-dark"
       >
         {syncMutation.isPending ? "Syncing..." : "Sync now"}
       </button>
@@ -289,12 +289,12 @@ function DiagnosticsSection(): JSX.Element {
   const dbStatus = statusQuery.isLoading ? "checking" : statusQuery.isError ? "unreachable" : "healthy";
 
   return (
-    <div className="space-y-2 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+    <div className="space-y-2 rounded-lg border border-line p-4 dark:border-line-dark">
       <h3 className="text-lg font-medium">Diagnostics</h3>
-      <p className="text-sm text-slate-700 dark:text-slate-300">
+      <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
         DB connection: {dbStatus === "checking" ? "checking..." : dbStatus}
       </p>
-      <p className="text-sm text-slate-700 dark:text-slate-300">
+      <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
         Last error: {statusQuery.data?.lastError ?? "none"}
       </p>
     </div>

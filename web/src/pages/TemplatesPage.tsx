@@ -296,7 +296,7 @@ export default function TemplatesPage(): JSX.Element {
         <button
           type="button"
           onClick={() => void templatesQuery.refetch()}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
         >
           Retry
         </button>
@@ -313,7 +313,7 @@ export default function TemplatesPage(): JSX.Element {
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+          className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent"
         >
           New template
         </button>
@@ -330,24 +330,24 @@ export default function TemplatesPage(): JSX.Element {
           {templates.map((template) => (
             <li
               key={template.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-4 dark:border-line-dark"
             >
               <div>
                 <button
                   type="button"
                   onClick={() => handleOpenEdit(template)}
-                  className="focus-ring rounded-md text-left font-medium text-sky-700 hover:underline dark:text-sky-400"
+                  className="focus-ring rounded-md text-left font-medium text-accent hover:underline dark:text-accent-dark"
                 >
                   {template.name}
                 </button>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{summarizeTemplateItems(template)}</p>
+                <p className="text-sm text-ink-tertiary dark:text-ink-secondary-dark">{summarizeTemplateItems(template)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleLogNow(template)}
                   disabled={logTemplateMutation.isPending && loggingTemplateId === template.id}
-                  className="focus-ring rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                  className="focus-ring rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
                 >
                   {logTemplateMutation.isPending && loggingTemplateId === template.id ? "Logging..." : "Log now"}
                 </button>
@@ -355,7 +355,7 @@ export default function TemplatesPage(): JSX.Element {
                   type="button"
                   onClick={() => deleteTemplateMutation.mutate(template.id)}
                   disabled={deleteTemplateMutation.isPending}
-                  className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas disabled:opacity-50 dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
                 >
                   Delete
                 </button>
@@ -443,10 +443,10 @@ function TemplateFormModal({
       <h2 id={titleId} className="mb-1 text-lg font-semibold">
         {title}
       </h2>
-      {note ? <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">{note}</p> : null}
+      {note ? <p className="mb-4 text-sm text-ink-secondary dark:text-ink-secondary-dark">{note}</p> : null}
       <form onSubmit={onSubmit} noValidate className="space-y-4" aria-label="Template editor">
         <div>
-          <label htmlFor={nameId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={nameId} className="mb-1 block text-sm font-medium text-ink-secondary dark:text-ink-secondary-dark">
             Template name
           </label>
           <input
@@ -455,7 +455,7 @@ function TemplateFormModal({
             value={values.name}
             onChange={(event) => onChange({ ...values, name: event.target.value })}
             placeholder="e.g. Weekday breakfast"
-            className="focus-ring w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="focus-ring w-full rounded-md border border-line px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
           />
         </div>
 
@@ -475,7 +475,7 @@ function TemplateFormModal({
         <button
           type="button"
           onClick={handleAddItem}
-          className="focus-ring rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="focus-ring rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
         >
           Add item
         </button>
@@ -490,14 +490,14 @@ function TemplateFormModal({
           <button
             type="button"
             onClick={onClose}
-            className="focus-ring rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isPending}
-            className="focus-ring rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-50"
           >
             {isPending ? pendingLabel : submitLabel}
           </button>

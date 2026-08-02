@@ -15,7 +15,7 @@ export default function App(): JSX.Element {
 
   return (
     <TokenGate>
-      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:flex">
+      <div className="min-h-screen bg-canvas text-ink-primary dark:bg-canvas-dark dark:text-ink-primary-dark md:flex">
         <Sidebar />
         <main className="min-w-0 flex-1">
           <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
