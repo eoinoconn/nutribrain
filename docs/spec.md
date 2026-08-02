@@ -1025,6 +1025,10 @@ Error codes agents should handle:
 - `serving_unit_immutable` — `update_food` attempt to change serving unit
 - `template_not_found`
 - `intervals_unavailable` — sync failed
+- `meal_not_found`
+- `meal_item_not_found`
+- `meal_item_food_linked` — `update_meal_item` attempt to edit macros while `food_id` is set
+- `meal_item_macros_required` — `update_meal_item` cleared `food_id` without supplying the now-required macros
 
 ## Appendix D — Sequence: label scan → log
 

@@ -32,6 +32,8 @@ from app.domain.errors import (
     FoodDuplicateError,
     FoodNotFoundError,
     IntervalsUnavailableError,
+    MealItemFoodLinkedError,
+    MealItemMacrosRequiredError,
     MealItemNotFoundError,
     MealNotFoundError,
     ServingUnitImmutableError,
@@ -51,6 +53,7 @@ from app.domain.foods import (
 )
 from app.domain.intervals_sync import get_sync_status, set_manual_calories_out, sync_intervals
 from app.domain.meal_deletion import delete_meal, delete_meal_item
+from app.domain.meal_editing import update_meal, update_meal_item
 from app.domain.meal_logging import log_meal
 from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
 from app.domain.nutrition_math import (
@@ -82,6 +85,8 @@ __all__ = [
     "IntervalsUnavailableError",
     "ItemMacros",
     "ManualCaloriesOutResult",
+    "MealItemFoodLinkedError",
+    "MealItemMacrosRequiredError",
     "MealItemNotFoundError",
     "MealItemResponse",
     "MealItemSpec",
@@ -127,5 +132,7 @@ __all__ = [
     "set_target",
     "sync_intervals",
     "update_food",
+    "update_meal",
+    "update_meal_item",
     "update_template",
 ]

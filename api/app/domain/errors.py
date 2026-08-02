@@ -101,6 +101,38 @@ class MealItemNotFoundError(DomainError):
         )
 
 
+class MealItemFoodLinkedError(DomainError):
+    """update_meal_item attempt to edit macros on a food-linked item.
+
+    Food-linked items compute macros live from the referenced food and must
+    stay NULL in storage (the ``adhoc_macros`` CHECK). Edit the food itself, or
+    clear ``food_id`` (supplying all required macros) to make the item ad-hoc.
+    """
+
+    def __init__(self, item_id: int) -> None:
+        super().__init__(
+            error="meal_item_food_linked",
+            message=(
+                f"Meal item {item_id} is linked to a food and computes macros live; "
+                "macro fields cannot be edited directly while food_id is set."
+            ),
+        )
+
+
+class MealItemMacrosRequiredError(DomainError):
+    """update_meal_item cleared food_id without supplying the now-required macros."""
+
+    def __init__(self, item_id: int, missing_fields: list[str]) -> None:
+        joined = ", ".join(missing_fields)
+        super().__init__(
+            error="meal_item_macros_required",
+            message=(
+                f"Meal item {item_id} is becoming ad-hoc (food_id cleared) and requires "
+                f"calories, protein_g, carbs_g, and fat_g. Missing: {joined}."
+            ),
+        )
+
+
 # --- Template errors -------------------------------------------------------
 
 

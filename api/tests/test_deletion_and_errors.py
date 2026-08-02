@@ -31,6 +31,8 @@ APPENDIX_C_CODES = frozenset(
         "intervals_unavailable",
         "meal_not_found",
         "meal_item_not_found",
+        "meal_item_food_linked",
+        "meal_item_macros_required",
     }
 )
 

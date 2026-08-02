@@ -14,7 +14,7 @@ from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 from app.api.foods import FoodResponse
-from app.db import QuantityUnit, ServingUnit
+from app.db import MealType, QuantityUnit, ServingUnit
 from app.domain import (
     MealItemSpec,
     TemplateItemSpec,
@@ -28,9 +28,11 @@ from app.domain import (
     set_favorite_food,
     set_target,
     update_food,
+    update_meal,
+    update_meal_item,
     update_template,
 )
-from app.domain.dto import MealResponse, TemplateResponse
+from app.domain.dto import MealItemResponse, MealResponse, TemplateResponse
 from app.domain.dto import SetTargetResult as SetTargetDto
 from app.domain.errors import DomainError
 from app.domain.foods import AddFoodResult as AddFoodDomainResult
@@ -39,11 +41,13 @@ from app.mcp._tool_common import capture_domain_error, run_with_session
 from app.mcp.date_args import resolve_date_arg
 from app.mcp.serializers import (
     DeleteResultModel,
+    MealItemModel,
     MealModel,
     SetTargetResultModel,
     TemplateModel,
     ToolErrorResponse,
     serialize_meal,
+    serialize_meal_item,
     serialize_set_target_result,
     serialize_template,
 )
@@ -84,6 +88,29 @@ type UpdateFoodResult = dict[str, object] | ToolErrorResponse
 type TemplateResult = TemplateModel | ToolErrorResponse
 type SetTargetResult = SetTargetResultModel | ToolErrorResponse
 type DeleteResult = DeleteResultModel | ToolErrorResponse
+type UpdateMealResult = MealModel | ToolErrorResponse
+type UpdateMealItemResult = MealItemModel | ToolErrorResponse
+
+# Sentinel default for update_meal_item_tool's food_id: unlike a plain `= None`
+# default, this survives being unset by the MCP call (pydantic's argument
+# validation only substitutes the Python default for a truly omitted key, and
+# does not run that default value through validation, so this sentinel object
+# passes straight through when the caller doesn't mention food_id at all).
+# That distinction matters here specifically because None is a meaningful,
+# consequential value for food_id (it converts the item to ad-hoc) — losing
+# "omitted" vs "explicitly null" would make quantity-only edits on food-linked
+# items spuriously demand macros. Plain `= None` (as used for the other
+# optional fields below, mirroring update_food) is fine where the field is
+# just cosmetic/optional and "leave alone" vs "clear" is low-stakes.
+_FOOD_ID_UNSET: object = object()
+
+# Same rationale as _FOOD_ID_UNSET, applied to update_meal_tool's notes: the
+# domain function's notes parameter uses the "explicit clear" sentinel
+# pattern (omit -> unchanged, pass None -> clear), so a plain `= None`
+# default here would forward notes=None on every call that simply omits
+# notes, silently wiping existing notes on unrelated single-field edits
+# (e.g. a meal_type-only correction).
+_NOTES_UNSET: object = object()
 
 
 def register_write_tools(mcp: FastMCP) -> None:
@@ -364,3 +391,83 @@ def register_write_tools(mcp: FastMCP) -> None:
         except DomainError as exc:
             return capture_domain_error(exc)
         return DeleteResultModel(**result)
+
+    @mcp.tool(
+        name="update_meal",
+        description=(
+            "Fix one field on an already-logged meal (meal_type, logged_at, or notes) "
+            "without touching its items. Use this instead of delete_meal + log_meal to "
+            "correct one field — that round trip risks a ghost meal if the delete races "
+            "or is forgotten. This never adds, removes, or edits items; use "
+            "update_meal_item or delete_meal_item for that."
+        ),
+    )
+    def update_meal_tool(
+        meal_id: int,
+        meal_type: MealType | None = None,
+        logged_at: datetime | None = None,
+        notes: str | None = _NOTES_UNSET,  # type: ignore[assignment]
+    ) -> UpdateMealResult:
+        domain_kwargs: dict[str, object] = {
+            "meal_id": meal_id,
+            "meal_type": meal_type,
+            "logged_at": logged_at,
+        }
+        if notes is not _NOTES_UNSET:
+            domain_kwargs["notes"] = notes
+        try:
+            meal = cast(
+                MealResponse,
+                run_with_session(update_meal, **domain_kwargs),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_meal(meal)
+
+    @mcp.tool(
+        name="update_meal_item",
+        description=(
+            "Fix one field on a single meal item: quantity, quantity_unit, food_id, or "
+            "(ad-hoc items only) macros. Use this instead of delete_meal_item + re-logging "
+            "an item to correct one field. Edits are local to this item only — they never "
+            "rewrite other meals; use update_food when the correction should propagate "
+            "everywhere that food is logged. Macro fields are rejected while food_id is "
+            "set (that item computes macros live); clear food_id to null to make it "
+            "ad-hoc, supplying calories/protein_g/carbs_g/fat_g in the same call."
+        ),
+    )
+    def update_meal_item_tool(
+        item_id: int,
+        quantity: Decimal | None = None,
+        quantity_unit: QuantityUnit | None = None,
+        food_id: int | None = _FOOD_ID_UNSET,  # type: ignore[assignment]
+        calories: Decimal | None = None,
+        protein_g: Decimal | None = None,
+        carbs_g: Decimal | None = None,
+        fat_g: Decimal | None = None,
+        fiber_g: Decimal | None = None,
+        sat_fat_g: Decimal | None = None,
+        sodium_mg: Decimal | None = None,
+    ) -> UpdateMealItemResult:
+        domain_kwargs: dict[str, object] = {
+            "item_id": item_id,
+            "quantity": quantity,
+            "quantity_unit": quantity_unit,
+            "calories": calories,
+            "protein_g": protein_g,
+            "carbs_g": carbs_g,
+            "fat_g": fat_g,
+            "fiber_g": fiber_g,
+            "sat_fat_g": sat_fat_g,
+            "sodium_mg": sodium_mg,
+        }
+        if food_id is not _FOOD_ID_UNSET:
+            domain_kwargs["food_id"] = food_id
+        try:
+            item = cast(
+                MealItemResponse,
+                run_with_session(update_meal_item, **domain_kwargs),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_meal_item(item)
