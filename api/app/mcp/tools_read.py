@@ -8,8 +8,21 @@ from typing import Literal, cast
 from fastmcp import FastMCP
 
 from app.api.foods import FoodSearchResponse
-from app.domain import get_day, get_effective_target, get_range, list_templates, search_foods
-from app.domain.dto import DayResponse, EffectiveTarget, RangeResponse, TemplateResponse
+from app.domain import (
+    find_meal,
+    get_day,
+    get_effective_target,
+    get_range,
+    list_templates,
+    search_foods,
+)
+from app.domain.dto import (
+    DayResponse,
+    EffectiveTarget,
+    MealItemMatch,
+    RangeResponse,
+    TemplateResponse,
+)
 from app.domain.errors import DomainError
 from app.domain.foods import FoodSearchResult
 from app.mcp._tool_common import capture_domain_error, run_with_session
@@ -17,12 +30,14 @@ from app.mcp.date_args import resolve_date_arg, resolve_date_range_args
 from app.mcp.serializers import (
     DayModel,
     EffectiveTargetModel,
+    MealItemMatchModel,
     RangeModel,
     TemplateModel,
     ToolErrorResponse,
     serialize_day,
     serialize_effective_target,
     serialize_food_search_result,
+    serialize_meal_item_match,
     serialize_range,
     serialize_template,
 )
@@ -30,6 +45,7 @@ from app.mcp.serializers import (
 type GetDayResult = DayModel | ToolErrorResponse
 type GetRangeResult = RangeModel | ToolErrorResponse
 type FindFoodResult = list[FoodSearchResponse] | ToolErrorResponse
+type FindMealResult = list[MealItemMatchModel] | ToolErrorResponse
 type ListTemplatesResult = list[TemplateModel] | ToolErrorResponse
 type GetTargetResult = EffectiveTargetModel | ToolErrorResponse | None
 
@@ -95,6 +111,29 @@ def register_read_tools(mcp: FastMCP) -> None:
         except DomainError as exc:
             return capture_domain_error(exc)
         return [serialize_food_search_result(item) for item in result]
+
+    @mcp.tool(
+        name="find_meal",
+        description=(
+            "Search logged meal items by name, most-recent-first. Use this for "
+            "'when did I last have X' instead of walking get_day one day at a "
+            "time. Each result carries meal_id/item_id and computed macros, so "
+            "it can feed directly into copy_meal or update_meal_item."
+        ),
+    )
+    def find_meal_tool(
+        query: str,
+        since: date | None = None,
+        limit: int = 20,
+    ) -> FindMealResult:
+        try:
+            result = cast(
+                list[MealItemMatch],
+                run_with_session(find_meal, query=query, since=since, limit=limit),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return [serialize_meal_item_match(item) for item in result]
 
     @mcp.tool(name="list_templates", description="List all non-deleted templates with full items.")
     def list_templates_tool() -> ListTemplatesResult:

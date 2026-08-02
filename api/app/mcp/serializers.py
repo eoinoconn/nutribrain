@@ -19,6 +19,7 @@ from app.domain.dto import (
     DayResponse,
     EffectiveTarget,
     ItemMacros,
+    MealItemMatch,
     MealItemResponse,
     MealResponse,
     PeriodTotals,
@@ -70,6 +71,18 @@ class MealModel(BaseModel):
     items: list[MealItemModel]
     totals: ItemMacrosModel
     delta_vs_target: ItemMacrosModel | None
+
+
+class MealItemMatchModel(BaseModel):
+    meal_id: int
+    item_id: int
+    food_id: int | None
+    logged_at: datetime
+    local_date: date
+    name: str
+    quantity: Decimal
+    quantity_unit: QuantityUnit
+    macros: ItemMacrosModel
 
 
 class TemplateItemModel(BaseModel):
@@ -212,6 +225,20 @@ def serialize_meal(value: MealResponse) -> MealModel:
         delta_vs_target=(
             serialize_macros(value.delta_vs_target) if value.delta_vs_target is not None else None
         ),
+    )
+
+
+def serialize_meal_item_match(value: MealItemMatch) -> MealItemMatchModel:
+    return MealItemMatchModel(
+        meal_id=value.meal_id,
+        item_id=value.item_id,
+        food_id=value.food_id,
+        logged_at=value.logged_at,
+        local_date=value.local_date,
+        name=value.name,
+        quantity=value.quantity,
+        quantity_unit=value.quantity_unit,
+        macros=serialize_macros(value.macros),
     )
 
 

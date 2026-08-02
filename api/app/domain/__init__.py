@@ -13,6 +13,7 @@ from app.domain.dto import (
     FoodCandidate,
     ItemMacros,
     ManualCaloriesOutResult,
+    MealItemMatch,
     MealItemResponse,
     MealItemSpec,
     MealResponse,
@@ -56,6 +57,7 @@ from app.domain.meal_copying import copy_meal
 from app.domain.meal_deletion import delete_meal, delete_meal_item
 from app.domain.meal_editing import update_meal, update_meal_item
 from app.domain.meal_logging import log_meal
+from app.domain.meal_search import find_meal
 from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
 from app.domain.nutrition_math import (
     UnitNormalizationError,
@@ -88,6 +90,7 @@ __all__ = [
     "ManualCaloriesOutResult",
     "MealItemFoodLinkedError",
     "MealItemMacrosRequiredError",
+    "MealItemMatch",
     "MealItemNotFoundError",
     "MealItemResponse",
     "MealItemSpec",
@@ -115,6 +118,7 @@ __all__ = [
     "delete_meal",
     "delete_meal_item",
     "delete_template",
+    "find_meal",
     "get_day",
     "get_effective_target",
     "get_range",

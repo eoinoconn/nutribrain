@@ -75,6 +75,25 @@ class MealItemResponse:
 
 
 @dataclass(frozen=True, slots=True)
+class MealItemMatch:
+    """A meal item matched by :func:`app.domain.meal_search.find_meal`.
+
+    Carries enough context (``meal_id``, ``item_id``) to feed directly into
+    ``copy_meal`` or ``update_meal_item`` without another round-trip.
+    """
+
+    meal_id: int
+    item_id: int
+    food_id: int | None
+    logged_at: datetime
+    local_date: date
+    name: str
+    quantity: Decimal
+    quantity_unit: QuantityUnit
+    macros: ItemMacros
+
+
+@dataclass(frozen=True, slots=True)
 class TemplateItemSpec:
     """Input spec for a single template item."""
 
