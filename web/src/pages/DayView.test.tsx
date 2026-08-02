@@ -167,6 +167,34 @@ describe("DayView", () => {
       await waitFor(() => expect(mockedGetDay).toHaveBeenCalledWith("2026-08-01"));
     });
 
+    it("dims the body and shows an updating indicator while a date-step fetch is in flight, without unmounting the date picker", async () => {
+      mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-20" }));
+      let resolveSecondFetch: ((day: DayResponse) => void) | undefined;
+      mockedGetDay.mockReturnValueOnce(
+        new Promise<DayResponse>((resolve) => {
+          resolveSecondFetch = resolve;
+        })
+      );
+      renderPage("/day/2026-07-20");
+
+      await screen.findByRole("heading", { name: /2026-07-20/ });
+      fireEvent.click(screen.getByRole("button", { name: /previous day/i }));
+
+      // While the new date's fetch is pending, the previous date's content
+      // stays on screen (dimmed) rather than being replaced by the
+      // first-paint skeleton or a blank page, and the date picker itself
+      // (needed to navigate further, or back) stays mounted and usable.
+      expect(await screen.findByText(/updating/i)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /2026-07-20/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /previous day/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /next day/i })).toBeInTheDocument();
+
+      resolveSecondFetch?.(makeDay({ date: "2026-07-19" }));
+
+      expect(await screen.findByRole("heading", { name: /2026-07-19/ })).toBeInTheDocument();
+      expect(screen.queryByText(/updating/i)).not.toBeInTheDocument();
+    });
+
     it("jumps to a directly-entered date via the native date input", async () => {
       mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-20" }));
       mockedGetDay.mockResolvedValueOnce(makeDay({ date: "2026-07-10" }));

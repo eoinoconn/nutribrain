@@ -24,7 +24,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createMeal,
   deleteMeal,
@@ -89,7 +89,15 @@ export default function DayView(): JSX.Element {
   const dayQuery = useQuery({
     queryKey: queryKeys.day(localDate),
     queryFn: () => getDay(localDate),
-    enabled: isValidDate
+    enabled: isValidDate,
+    // §8: date-picker navigation (prev/next/date-input) fetches a new
+    // `['day', date]` key on every step. Without this, each step would drop
+    // back into `isLoading` (no cached data for the new key yet) and swap
+    // the whole page for the generic first-paint skeleton below — losing
+    // the date-picker controls themselves mid-navigation and causing a
+    // layout jump. Keeping the previous date's data on screen (dimmed, via
+    // `isRefetching` below) while the new fetch is in flight avoids both.
+    placeholderData: keepPreviousData
   });
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -427,6 +435,13 @@ export default function DayView(): JSX.Element {
   const hasMeals = flatMealGroups.length > 0;
   const isToday = day.date === todayLocalDate();
   const title = dayTitleLabel(day.date, todayLocalDate());
+  // True only for a background refetch of an *already-displayed* date (e.g.
+  // stepping to a new date via the picker, which keeps rendering the
+  // previous date's data per `placeholderData: keepPreviousData` above) —
+  // not the first-paint case, which is handled by the `isLoading` branch
+  // above and never reaches here. Dim the body rather than swap it out so
+  // the date-picker/header stay stable and interactive during navigation.
+  const isRefetching = dayQuery.isFetching && !dayQuery.isLoading;
 
   return (
     <section className="space-y-8">
@@ -462,9 +477,17 @@ export default function DayView(): JSX.Element {
         }
       />
 
-      <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
+      {isRefetching ? (
+        <p className="flex items-center gap-2 text-xs text-ink-tertiary dark:text-ink-secondary-dark">
+          <Skeleton className="h-2 w-2 rounded-full" label="Updating for selected date" />
+          <span aria-hidden="true">Updating&hellip;</span>
+        </p>
+      ) : null}
 
-      <div className="flex flex-wrap gap-3">
+      <div aria-busy={isRefetching} className={`space-y-8 transition-opacity ${isRefetching ? "opacity-50" : "opacity-100"}`}>
+        <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
+
+        <div className="flex flex-wrap gap-3">
         <button
           type="button"
           onClick={handleToggleEditor}
@@ -651,6 +674,7 @@ export default function DayView(): JSX.Element {
           action={{ label: "Log a meal", onClick: handleToggleEditor }}
         />
       )}
+      </div>
     </section>
   );
 }
