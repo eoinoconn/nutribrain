@@ -23,6 +23,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -87,6 +88,17 @@ class MealItemSource(enum.StrEnum):
 class IntervalsSource(enum.StrEnum):
     sync = "sync"
     manual = "manual"
+
+
+class PlannedWorkoutSource(enum.StrEnum):
+    intervals_planned = "intervals_planned"
+    intervals_completed = "intervals_completed"
+    manual = "manual"
+
+
+class PlannedWorkoutStatus(enum.StrEnum):
+    planned = "planned"
+    completed = "completed"
 
 
 def _pg_enum(enum_cls: type[enum.Enum], name: str) -> SAEnum:
@@ -266,6 +278,48 @@ class IntervalsCaloriesOut(Base):
         default=IntervalsSource.sync,
         server_default=IntervalsSource.sync.value,
     )
+
+
+class PlannedWorkout(Base):
+    """A planned or completed workout, sourced from intervals.icu or manual entry.
+
+    (§3 energy_balance_chart.md). Re-syncing intervals.icu upserts on
+    ``(source, external_id)`` rather than duplicating rows.
+    """
+
+    __tablename__ = "planned_workouts"
+    __table_args__ = (
+        UniqueConstraint(
+            "source",
+            "external_id",
+            name="uq_planned_workouts_source_external_id",
+        ),
+        Index("ix_planned_workouts_local_date", "local_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # intervals.icu event/activity id; unique per source, absent for manual rows.
+    external_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[PlannedWorkoutSource] = mapped_column(
+        _pg_enum(PlannedWorkoutSource, "planned_workout_source")
+    )
+    local_date: Mapped[date] = mapped_column(Date)
+    # Null start times are not usable for this feature; reject/skip at sync time.
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    duration_minutes: Mapped[int] = mapped_column(Integer)
+    # intervals.icu `type` (Ride/Run/Swim/...); nullable for manual rows.
+    sport_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # intervals.icu's own computed work estimate; requires structured targets
+    # plus configured zones, so it's often absent on unstructured placeholders.
+    icu_joules: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_calories: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Completed rows: the same device-reported calories field, kept
+    # per-activity instead of summed. Not a new sourcing mechanism.
+    actual_calories: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[PlannedWorkoutStatus] = mapped_column(
+        _pg_enum(PlannedWorkoutStatus, "planned_workout_status")
+    )
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class IntervalsSyncStatus(Base):
