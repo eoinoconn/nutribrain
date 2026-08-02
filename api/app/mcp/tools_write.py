@@ -6,7 +6,7 @@ history rewrites and other irreversible mistakes.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from typing import cast
 
@@ -19,6 +19,7 @@ from app.domain import (
     MealItemSpec,
     TemplateItemSpec,
     add_food,
+    copy_meal,
     create_template,
     delete_meal,
     delete_meal_item,
@@ -90,6 +91,7 @@ type SetTargetResult = SetTargetResultModel | ToolErrorResponse
 type DeleteResult = DeleteResultModel | ToolErrorResponse
 type UpdateMealResult = MealModel | ToolErrorResponse
 type UpdateMealItemResult = MealItemModel | ToolErrorResponse
+type CopyMealResult = MealModel | ToolErrorResponse
 
 # Sentinel default for update_meal_item_tool's food_id: unlike a plain `= None`
 # default, this survives being unset by the MCP call (pydantic's argument
@@ -173,6 +175,43 @@ def register_write_tools(mcp: FastMCP) -> None:
                     logged_at=when,
                     local_tz=local_tz,
                     meal_type=meal_type,
+                    quantity_scale=quantity_scale,
+                    notes=notes,
+                ),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_meal(meal)
+
+    @mcp.tool(
+        name="copy_meal",
+        description=(
+            "Copy an already-logged meal's items into a new meal, e.g. 'same as "
+            "yesterday'. Food-linked items keep computing macros live (no snapshot); "
+            "ad-hoc items copy their stored macro snapshot. meal_type carries forward "
+            "from the source meal. notes are NOT copied — pass notes explicitly if the "
+            "new meal needs one, otherwise it starts blank. to_day defaults to today; "
+            "at defaults to the source meal's own time-of-day. Cheaper than get_day + "
+            "parse + log_meal for repeating a meal."
+        ),
+    )
+    def copy_meal_tool(
+        meal_id: int,
+        local_tz: str,
+        to_day: str | date | None = None,
+        at: time | None = None,
+        quantity_scale: Decimal | None = None,
+        notes: str | None = None,
+    ) -> CopyMealResult:
+        try:
+            meal = cast(
+                MealResponse,
+                run_with_session(
+                    copy_meal,
+                    meal_id=meal_id,
+                    local_tz=local_tz,
+                    to_day=to_day,
+                    at=at,
                     quantity_scale=quantity_scale,
                     notes=notes,
                 ),

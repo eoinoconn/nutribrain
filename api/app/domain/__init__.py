@@ -52,6 +52,7 @@ from app.domain.foods import (
     update_food,
 )
 from app.domain.intervals_sync import get_sync_status, set_manual_calories_out, sync_intervals
+from app.domain.meal_copying import copy_meal
 from app.domain.meal_deletion import delete_meal, delete_meal_item
 from app.domain.meal_editing import update_meal, update_meal_item
 from app.domain.meal_logging import log_meal
@@ -108,6 +109,7 @@ __all__ = [
     "UpdateFoodResult",
     "add_food",
     "compute_item_macros",
+    "copy_meal",
     "create_template",
     "delete_food",
     "delete_meal",
