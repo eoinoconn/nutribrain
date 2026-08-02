@@ -243,3 +243,17 @@ class ManualCaloriesOutResult:
     date: date
     calories_out: int
     fetched_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AppSettingsDTO:
+    """Account-level app settings singleton (§6a, EC-06).
+
+    Single-user app, no ``user_id`` — this is the one row of settings that
+    apply to the whole account. ``local_timezone`` is an IANA tz name (e.g.
+    ``"Europe/Dublin"``); the energy chart (EC-05) will read it to resolve
+    local-midnight bounds on days with no logged meal to infer a timezone
+    from.
+    """
+
+    local_timezone: str

@@ -340,6 +340,22 @@ class IntervalsSyncStatus(Base):
     )
 
 
+class AppSettings(Base):
+    """Singleton row (id=1) of account-level app settings (§6a, EC-06).
+
+    Single-user app, no ``user_id`` — one row holds every account-level
+    setting. Mirrors the ``id=1`` convention used by ``IntervalsSyncStatus``
+    rather than adding a ``CHECK (id = 1)`` constraint, since that existing
+    singleton table enforces single-row-ness purely by domain-layer
+    convention (always ``session.get(Model, 1)``), not a DB constraint.
+    """
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    local_timezone: Mapped[str] = mapped_column(Text, default="UTC", server_default="UTC")
+
+
 class McpOAuthKV(Base):
     """Backing store for FastMCP's ``GoogleProvider`` ``client_storage`` (F-101).
 

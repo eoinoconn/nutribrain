@@ -1025,6 +1025,7 @@ Error codes agents should handle:
 - `serving_unit_immutable` — `update_food` attempt to change serving unit
 - `template_not_found`
 - `intervals_unavailable` — sync failed
+- `invalid_timezone` — `PATCH /api/settings` received a value that isn't a valid IANA timezone name
 
 ## Appendix D — Sequence: label scan → log
 

@@ -7,6 +7,7 @@ implemented in one place.
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
 from app.domain.day_aggregation import get_day, get_range
 from app.domain.dto import (
+    AppSettingsDTO,
     DayMealGroup,
     DayResponse,
     EffectiveTarget,
@@ -32,6 +33,7 @@ from app.domain.errors import (
     FoodDuplicateError,
     FoodNotFoundError,
     IntervalsUnavailableError,
+    InvalidTimezoneError,
     MealItemNotFoundError,
     MealNotFoundError,
     ServingUnitImmutableError,
@@ -58,6 +60,7 @@ from app.domain.nutrition_math import (
     compute_item_macros,
     normalize_to_grams,
 )
+from app.domain.settings import get_settings, update_settings
 from app.domain.targets import get_effective_target, list_targets, set_target
 from app.domain.templates import (
     create_template,
@@ -70,6 +73,7 @@ from app.domain.templates import (
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
     "AddFoodResult",
+    "AppSettingsDTO",
     "DayMealGroup",
     "DayResponse",
     "DomainError",
@@ -80,6 +84,7 @@ __all__ = [
     "FoodNotFoundError",
     "FoodSearchResult",
     "IntervalsUnavailableError",
+    "InvalidTimezoneError",
     "ItemMacros",
     "ManualCaloriesOutResult",
     "MealItemNotFoundError",
@@ -111,6 +116,7 @@ __all__ = [
     "get_day",
     "get_effective_target",
     "get_range",
+    "get_settings",
     "get_sync_status",
     "infer_meal_type",
     "list_targets",
@@ -127,5 +133,6 @@ __all__ = [
     "set_target",
     "sync_intervals",
     "update_food",
+    "update_settings",
     "update_template",
 ]

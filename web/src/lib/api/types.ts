@@ -351,3 +351,13 @@ export interface ManualCaloriesOutResponse {
   caloriesOut: number;
   fetchedAt: string;
 }
+
+// --- Settings (api/app/api/settings.py) -------------------------------------
+
+export interface AppSettings {
+  localTimezone: string;
+}
+
+export interface UpdateSettingsRequest {
+  localTimezone: string;
+}

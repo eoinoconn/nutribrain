@@ -122,3 +122,16 @@ class IntervalsUnavailableError(DomainError):
 
     def __init__(self, message: str = "intervals.icu sync failed.") -> None:
         super().__init__(error="intervals_unavailable", message=message)
+
+
+# --- Settings errors ---------------------------------------------------------
+
+
+class InvalidTimezoneError(DomainError):
+    """update_settings received a value that isn't a valid IANA timezone name."""
+
+    def __init__(self, local_timezone: str) -> None:
+        super().__init__(
+            error="invalid_timezone",
+            message=f"'{local_timezone}' is not a valid IANA timezone name.",
+        )
