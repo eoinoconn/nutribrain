@@ -1023,6 +1023,7 @@ Error codes agents should handle:
 - `food_ambiguous` — multiple matches, no resolution rule fires
 - `food_duplicate` — `add_food` name collision without `force: true`
 - `serving_unit_immutable` — `update_food` attempt to change serving unit
+- `food_merge_same_food` — `merge_food` called with `from_id` equal to `into_id`
 - `template_not_found`
 - `intervals_unavailable` — sync failed
 - `meal_not_found`

@@ -22,7 +22,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 import app.mcp.tools_write as tools_write_module
-from app.db import Meal
+from app.db import Food, Meal
 from app.main import mcp
 
 
@@ -64,3 +64,92 @@ async def test_update_meal_tool_explicit_null_notes_clears(
     assert result.is_error is False
     payload = result.structured_content["result"]
     assert payload["notes"] is None
+
+
+@pytest.mark.asyncio
+async def test_delete_food_tool_happy_path(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_food: Callable[..., Food],
+) -> None:
+    food = make_food(name="Old Food")
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool("delete_food", {"food_id": food.id})
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["id"] == food.id
+    db_session.refresh(food)
+    assert food.deleted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_delete_food_tool_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool("delete_food", {"food_id": 999999})
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["error"] == "food_not_found"
+
+
+@pytest.mark.asyncio
+async def test_merge_food_tool_happy_path(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_food: Callable[..., Food],
+    make_meal: Callable[..., Meal],
+    make_meal_item,
+) -> None:
+    from_food = make_food(name="Duplicate Yogurt")
+    into_food = make_food(name="GetPRO")
+    meal = make_meal()
+    item = make_meal_item(food=from_food, meal_id=meal.id)
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool("merge_food", {"from_id": from_food.id, "into_id": into_food.id})
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["reassigned_count"] == 1
+    assert payload["into_food"]["id"] == into_food.id
+    assert payload["from_food"]["id"] == from_food.id
+    db_session.refresh(item)
+    assert item.food_id == into_food.id
+
+
+@pytest.mark.asyncio
+async def test_merge_food_tool_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_food: Callable[..., Food],
+) -> None:
+    from_food = make_food(name="Duplicate Yogurt")
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool("merge_food", {"from_id": from_food.id, "into_id": 999999})
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["error"] == "food_not_found"
+
+
+@pytest.mark.asyncio
+async def test_merge_food_tool_self_merge_error(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_food: Callable[..., Food],
+) -> None:
+    food = make_food(name="GetPRO")
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool("merge_food", {"from_id": food.id, "into_id": food.id})
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["error"] == "food_merge_same_food"

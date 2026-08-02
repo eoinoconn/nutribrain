@@ -18,11 +18,14 @@ from sqlalchemy.orm import Session
 from app.db import ServingUnit
 from app.domain import (
     FoodDuplicateError,
+    FoodMergeSameFoodError,
     FoodNotFoundError,
     ServingUnitImmutableError,
     add_food,
     compute_item_macros,
     delete_food,
+    merge_food,
+    search_foods,
     set_favorite_food,
     update_food,
 )
@@ -214,3 +217,129 @@ class TestDeleteFood:
 
         with pytest.raises(FoodNotFoundError):
             delete_food(db_session, food_id=food.id)
+
+
+class TestSearchFoodsNormalizedMatch:
+    """MCP-06: normalized substring pre-filter for queries with extra words/spacing."""
+
+    def test_search_foods_matches_query_with_trailing_extra_word(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="GetPRO")
+
+        results = search_foods(db_session, query="getpro yogurt")
+
+        assert any(r.food.name == "GetPRO" for r in results)
+
+    def test_search_foods_matches_query_with_internal_space_and_extra_word(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="GetPRO")
+
+        results = search_foods(db_session, query="get pro yogurt")
+
+        assert any(r.food.name == "GetPRO" for r in results)
+
+
+class TestMergeFood:
+    def test_merge_food_reassigns_meal_items_and_leaves_others_untouched(
+        self, db_session: Session, make_food, make_meal, make_meal_item
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+        other_food = make_food(name="Unrelated Food")
+
+        meal = make_meal()
+        item = make_meal_item(food=from_food, meal_id=meal.id)
+        other_item = make_meal_item(food=other_food, meal_id=meal.id)
+
+        result = merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+        db_session.refresh(item)
+        db_session.refresh(other_item)
+        assert item.food_id == into_food.id
+        assert other_item.food_id == other_food.id
+        assert result.reassigned_count == 1
+
+    def test_merge_food_soft_deletes_from_food_and_excludes_it_from_search(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+
+        result = merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+        assert result.from_food.deleted_at is not None
+        results = search_foods(db_session, query="Duplicate Yogurt")
+        assert all(r.food.id != from_food.id for r in results)
+
+    def test_merge_food_into_nonexistent_raises_not_found(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+
+        with pytest.raises(FoodNotFoundError):
+            merge_food(db_session, from_id=from_food.id, into_id=999999)
+
+    def test_merge_food_from_already_deleted_raises_not_found(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+        delete_food(db_session, food_id=from_food.id)
+
+        with pytest.raises(FoodNotFoundError):
+            merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+    def test_merge_food_into_already_deleted_raises_not_found(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+        delete_food(db_session, food_id=into_food.id)
+
+        with pytest.raises(FoodNotFoundError):
+            merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+    def test_merge_food_self_merge_raises_domain_error(
+        self, db_session: Session, make_food
+    ) -> None:
+        food = make_food(name="GetPRO")
+
+        with pytest.raises(FoodMergeSameFoodError) as exc_info:
+            merge_food(db_session, from_id=food.id, into_id=food.id)
+
+        assert exc_info.value.error == "food_merge_same_food"
+
+    def test_merge_food_reassigned_items_compute_against_into_foods_current_macros(
+        self, db_session: Session, make_food, make_meal, make_meal_item
+    ) -> None:
+        """No macro snapshot is taken on merge: reassigned items compute live."""
+
+        from_food = make_food(
+            name="Duplicate Yogurt",
+            serving_size=Decimal("100"),
+            serving_unit=ServingUnit.g,
+            calories=Decimal("100"),
+            protein_g=Decimal("10"),
+            carbs_g=Decimal("10"),
+            fat_g=Decimal("1"),
+        )
+        into_food = make_food(
+            name="GetPRO",
+            serving_size=Decimal("100"),
+            serving_unit=ServingUnit.g,
+            calories=Decimal("500"),
+            protein_g=Decimal("50"),
+            carbs_g=Decimal("40"),
+            fat_g=Decimal("10"),
+        )
+        meal = make_meal()
+        item = make_meal_item(food=from_food, meal_id=meal.id, quantity=Decimal("100"))
+
+        merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+        db_session.refresh(item)
+        db_session.refresh(into_food)
+        macros = compute_item_macros(item, into_food)
+        assert macros.calories == Decimal("500")

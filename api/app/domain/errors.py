@@ -78,6 +78,16 @@ class ServingUnitImmutableError(DomainError):
         )
 
 
+class FoodMergeSameFoodError(DomainError):
+    """merge_food called with from_id == into_id."""
+
+    def __init__(self, food_id: int) -> None:
+        super().__init__(
+            error="food_merge_same_food",
+            message=f"Cannot merge food {food_id} into itself.",
+        )
+
+
 # --- Meal errors -----------------------------------------------------------
 
 

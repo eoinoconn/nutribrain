@@ -7,17 +7,20 @@ serving_unit is forbidden — the correct action is to create a new food.
 from __future__ import annotations
 
 # --- DTOs ------------------------------------------------------------------
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, cast
 
-from sqlalchemy import case, func, select
+from sqlalchemy import ColumnElement, CursorResult, case, func, literal, select, update
 from sqlalchemy.orm import Session
 
 from app.db import Food, Meal, MealItem, ServingUnit
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
 from app.domain.errors import (
     FoodDuplicateError,
+    FoodMergeSameFoodError,
     FoodNotFoundError,
     ServingUnitImmutableError,
 )
@@ -42,6 +45,13 @@ class FoodSearchResult:
     food: Food
     last_logged_at: datetime | None
     logged_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class MergeFoodResult:
+    into_food: Food
+    from_food: Food
+    reassigned_count: int
 
 
 # Sentinel for distinguishing "not passed" from "explicitly passed None"
@@ -194,6 +204,54 @@ def delete_food(
     return food
 
 
+def merge_food(
+    session: Session,
+    *,
+    from_id: int,
+    into_id: int,
+    now: datetime | None = None,
+) -> MergeFoodResult:
+    """Merge ``from_id`` into ``into_id``: reassign meal_items, then soft-delete ``from_id``.
+
+    Use this instead of ``delete_food`` when a duplicate food has already been
+    logged against — it reassigns every ``meal_item.food_id`` referencing
+    ``from_id`` over to ``into_id`` in one bulk update (so past meals keep
+    computing macros live, now against ``into_id``'s current values) before
+    soft-deleting ``from_id``. Both foods must exist and not already be
+    soft-deleted, and ``from_id`` must differ from ``into_id``.
+    """
+
+    if from_id == into_id:
+        raise FoodMergeSameFoodError(from_id)
+
+    from_food = session.scalar(select(Food).where(Food.id == from_id, Food.deleted_at.is_(None)))
+    if from_food is None:
+        raise FoodNotFoundError(f"id:{from_id}")
+
+    into_food = session.scalar(select(Food).where(Food.id == into_id, Food.deleted_at.is_(None)))
+    if into_food is None:
+        raise FoodNotFoundError(f"id:{into_id}")
+
+    update_result = session.execute(
+        update(MealItem).where(MealItem.food_id == from_id).values(food_id=into_id)
+    )
+    reassigned_count = cast("CursorResult[Any]", update_result).rowcount or 0
+
+    from_food = delete_food(session, food_id=from_id, now=now)
+
+    logger.info(
+        "food_merged",
+        from_id=from_id,
+        into_id=into_id,
+        reassigned_count=reassigned_count,
+    )
+    return MergeFoodResult(
+        into_food=into_food,
+        from_food=from_food,
+        reassigned_count=reassigned_count,
+    )
+
+
 def search_foods(
     session: Session,
     *,
@@ -207,6 +265,7 @@ def search_foods(
     """
 
     lowered_query = query.strip().lower()
+    normalized_query = _normalize_for_match(lowered_query)
     stats_subquery = (
         select(
             MealItem.food_id.label("food_id"),
@@ -231,6 +290,24 @@ def search_foods(
 
     if lowered_query:
         exact_match = func.lower(Food.name) == lowered_query
+        # Whitespace/punctuation-normalized substring match, checked in both
+        # directions. This is what actually catches "getpro yogurt" /
+        # "get pro yogurt" against a food named "GetPRO": the extra trailing
+        # word dilutes trigram similarity below threshold (an internal space
+        # in the query — "get pro" vs "getpro" — breaks trigrams straddling
+        # the food-name boundary), and the plain `contains` fallback only
+        # ever checks "does the food name contain the query", which can never
+        # be true once the query has more words appended than the food name
+        # itself. Stripping non-alphanumeric characters from both sides and
+        # checking containment in either direction closes that gap without
+        # touching the trigram/threshold logic itself.
+        normalized_name = _normalize_for_match_expr(func.lower(Food.name))
+        normalized_match = (
+            normalized_name.contains(normalized_query)
+            | literal(normalized_query).contains(normalized_name)
+            if normalized_query
+            else literal(False)
+        )
         has_trigram_similarity = session.scalar(select(func.to_regproc("similarity"))) is not None
         if has_trigram_similarity:
             similarity = func.similarity(func.lower(Food.name), lowered_query)
@@ -239,6 +316,7 @@ def search_foods(
                     exact_match
                     | (similarity >= FOOD_NAME_SIMILARITY_THRESHOLD)
                     | func.lower(Food.name).contains(lowered_query)
+                    | normalized_match
                 )
                 .order_by(
                     case((exact_match, 1), else_=0).desc(),
@@ -250,7 +328,9 @@ def search_foods(
             )
         else:
             stmt = (
-                stmt.where(exact_match | func.lower(Food.name).contains(lowered_query))
+                stmt.where(
+                    exact_match | func.lower(Food.name).contains(lowered_query) | normalized_match
+                )
                 .order_by(
                     case((exact_match, 1), else_=0).desc(),
                     Food.is_favorite.desc(),
@@ -273,6 +353,20 @@ def search_foods(
 
 
 # --- Internal helpers -------------------------------------------------------
+
+_NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
+
+
+def _normalize_for_match(lowered: str) -> str:
+    """Strip whitespace/punctuation from an already-lowered string for matching."""
+
+    return _NON_ALNUM_RE.sub("", lowered)
+
+
+def _normalize_for_match_expr(lowered_name_expr: ColumnElement[str]) -> ColumnElement[str]:
+    """SQL-side equivalent of :func:`_normalize_for_match` for a lowered column expr."""
+
+    return func.regexp_replace(lowered_name_expr, "[^a-z0-9]", "", "g")
 
 
 def _find_duplicates(session: Session, name: str) -> list[Food]:

@@ -21,11 +21,13 @@ from app.domain import (
     add_food,
     copy_meal,
     create_template,
+    delete_food,
     delete_meal,
     delete_meal_item,
     delete_template,
     log_meal,
     log_template,
+    merge_food,
     set_favorite_food,
     set_target,
     update_food,
@@ -37,6 +39,7 @@ from app.domain.dto import MealItemResponse, MealResponse, TemplateResponse
 from app.domain.dto import SetTargetResult as SetTargetDto
 from app.domain.errors import DomainError
 from app.domain.foods import AddFoodResult as AddFoodDomainResult
+from app.domain.foods import MergeFoodResult as MergeFoodDomainResult
 from app.domain.foods import UpdateFoodResult as UpdateFoodDomainResult
 from app.mcp._tool_common import capture_domain_error, run_with_session
 from app.mcp.date_args import resolve_date_arg, resolve_effective_local_tz
@@ -86,6 +89,8 @@ type LogMealResult = MealModel | ToolErrorResponse
 type LogTemplateResult = MealModel | ToolErrorResponse
 type AddFoodResult = FoodResponse | ToolErrorResponse
 type UpdateFoodResult = dict[str, object] | ToolErrorResponse
+type DeleteFoodResult = FoodResponse | ToolErrorResponse
+type MergeFoodResult = dict[str, object] | ToolErrorResponse
 type TemplateResult = TemplateModel | ToolErrorResponse
 type SetTargetResult = SetTargetResultModel | ToolErrorResponse
 type DeleteResult = DeleteResultModel | ToolErrorResponse
@@ -319,6 +324,45 @@ def register_write_tools(mcp: FastMCP) -> None:
         return {
             "food": FoodResponse.model_validate(result.food).model_dump(mode="json"),
             "recompute_count": result.affected_meals_count,
+        }
+
+    @mcp.tool(
+        name="delete_food",
+        description=(
+            "Soft-delete a food with no logged history. If this food has been logged "
+            "against, use merge_food instead so past meal_items are reassigned rather "
+            "than left pointing at a deleted food."
+        ),
+    )
+    def delete_food_tool(food_id: int) -> DeleteFoodResult:
+        try:
+            food = run_with_session(delete_food, food_id=food_id)
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return FoodResponse.model_validate(food)
+
+    @mcp.tool(
+        name="merge_food",
+        description=(
+            "Merge a duplicate food into another: reassigns every meal_item.food_id "
+            "from from_id to into_id (past meals keep computing macros live, now "
+            "against into_id's current values), then soft-deletes from_id. Use this "
+            "instead of delete_food + re-adding when a food was logged as a duplicate "
+            "of one that already exists."
+        ),
+    )
+    def merge_food_tool(from_id: int, into_id: int) -> MergeFoodResult:
+        try:
+            result = cast(
+                MergeFoodDomainResult,
+                run_with_session(merge_food, from_id=from_id, into_id=into_id),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return {
+            "into_food": FoodResponse.model_validate(result.into_food).model_dump(mode="json"),
+            "from_food": FoodResponse.model_validate(result.from_food).model_dump(mode="json"),
+            "reassigned_count": result.reassigned_count,
         }
 
     @mcp.tool(
