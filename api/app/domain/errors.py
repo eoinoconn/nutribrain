@@ -135,3 +135,23 @@ class InvalidTimezoneError(DomainError):
             error="invalid_timezone",
             message=f"'{local_timezone}' is not a valid IANA timezone name.",
         )
+
+
+# --- Planned workout errors -------------------------------------------------
+
+
+class NaiveDatetimeError(DomainError):
+    """A caller-supplied timestamp field is missing a UTC offset.
+
+    See docs/backlog.md KI-001: `meal_logging.log_meal`'s equivalent check
+    raises a bare `ValueError`, which surfaces as an unhandled 500 instead of
+    a 4xx. New call sites (e.g. `create_manual_planned_workout`) should raise
+    this `DomainError` subclass instead so the mapping in `app/main.py`'s
+    `ERROR_STATUS_BY_CODE` turns it into a proper 422.
+    """
+
+    def __init__(self, field: str) -> None:
+        super().__init__(
+            error="naive_datetime",
+            message=f"'{field}' must be timezone-aware (include a UTC offset).",
+        )

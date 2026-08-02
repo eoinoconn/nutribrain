@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.db import MealItemSource, MealType, QuantityUnit
+from app.db import (
+    MealItemSource,
+    MealType,
+    PlannedWorkoutSource,
+    PlannedWorkoutStatus,
+    QuantityUnit,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,6 +248,29 @@ class ManualCaloriesOutResult:
 
     date: date
     calories_out: int
+    fetched_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedWorkoutDTO:
+    """A planned/completed workout row, synced or manual (EC-01/EC-04, §6).
+
+    Mirrors the ``planned_workouts`` table 1:1. A manually-entered row
+    (``source='manual'``) has ``external_id``, ``sport_type``, ``icu_joules``,
+    and ``actual_calories`` all None — see the model's column comments.
+    """
+
+    id: int
+    external_id: str | None
+    source: PlannedWorkoutSource
+    local_date: date
+    start_at: datetime
+    duration_minutes: int
+    sport_type: str | None
+    icu_joules: int | None
+    estimated_calories: int | None
+    actual_calories: int | None
+    status: PlannedWorkoutStatus
     fetched_at: datetime
 
 

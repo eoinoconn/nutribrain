@@ -27,6 +27,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createMeal,
+  createPlannedWorkout,
   deleteMeal,
   deleteMealItem,
   getDay,
@@ -40,8 +41,15 @@ import EmptyState from "../design/EmptyState";
 import type { DayMealGroup, DayResponse, MealItemRequest, MealType } from "../lib/api/types";
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
 import { QuickMacroEntry, type QuickMacroValue } from "../components/QuickMacroEntry";
+import { PlannedWorkoutForm, type PlannedWorkoutValue } from "../components/PlannedWorkoutForm";
 import { DayHeader, MEAL_TYPE_LABELS, SummaryRow, formatCalories, formatGrams } from "../components/DaySummary";
-import { buildCreateMealRequest, buildQuickMacroRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
+import {
+  buildCreateMealRequest,
+  buildCreatePlannedWorkoutRequest,
+  buildQuickMacroRequest,
+  mealEditorItemToRequest,
+  mealItemToEditorItem
+} from "../lib/mealForms";
 import { addDays, dayTitleLabel } from "../lib/dateNav";
 
 /** Best-effort key only; the header's displayed date always comes from the
@@ -107,6 +115,11 @@ export default function DayView(): JSX.Element {
   // on its own, per §4 of docs/features/today_ui_redesign.md.
   const [isQuickMacroOpen, setIsQuickMacroOpen] = useState(false);
   const [quickMacroValue, setQuickMacroValue] = useState<QuickMacroValue | null>(null);
+  // Independent of the meal-entry panels — "plan a workout" (EC-04, §6) is a
+  // manual fallback for days without an intervals.icu event, unrelated to
+  // logging food, so opening it doesn't close (and isn't closed by) either.
+  const [isPlannedWorkoutOpen, setIsPlannedWorkoutOpen] = useState(false);
+  const [plannedWorkoutValue, setPlannedWorkoutValue] = useState<PlannedWorkoutValue | null>(null);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingItemValue, setEditingItemValue] = useState<MealEditorItem | null>(null);
@@ -171,6 +184,22 @@ export default function DayView(): JSX.Element {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.day(localDate) });
     }
+  });
+
+  const createPlannedWorkoutMutation = useMutation({
+    mutationFn: (payload: NonNullable<ReturnType<typeof buildCreatePlannedWorkoutRequest>>) =>
+      createPlannedWorkout(payload),
+    onError: () => {
+      showToast("Could not save planned workout.", "error");
+    },
+    onSuccess: () => {
+      showToast("Workout planned.", "success");
+      setIsPlannedWorkoutOpen(false);
+      setPlannedWorkoutValue(null);
+    }
+    // No `onSettled` invalidation: no read path in this app queries
+    // `planned_workouts` yet (EC-05, not built) — nothing on this page
+    // displays the new row today, so there's nothing to refetch.
   });
 
   const syncMutation = useMutation({
@@ -344,6 +373,21 @@ export default function DayView(): JSX.Element {
     logMacrosMutation.mutate(request);
   }
 
+  function handleTogglePlannedWorkout(): void {
+    setIsPlannedWorkoutOpen((open) => !open);
+  }
+
+  function handleSubmitPlannedWorkout(): void {
+    const request = plannedWorkoutValue
+      ? buildCreatePlannedWorkoutRequest(plannedWorkoutValue, dayQuery.data?.date ?? localDate)
+      : null;
+    if (!request) {
+      showToast("Enter estimated calories before saving.", "error");
+      return;
+    }
+    createPlannedWorkoutMutation.mutate(request);
+  }
+
   // The row toggle below is a native `<button>`, so Enter/Space already
   // activate it via the browser's default keyboard handling — no extra
   // `onKeyDown` wiring needed (same pattern as the editor/quick-macro
@@ -504,6 +548,14 @@ export default function DayView(): JSX.Element {
         >
           {isQuickMacroOpen ? "Cancel" : "Log macros"}
         </button>
+        <button
+          type="button"
+          onClick={handleTogglePlannedWorkout}
+          aria-expanded={isPlannedWorkoutOpen}
+          className="focus-ring rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-canvas dark:border-line-dark dark:hover:bg-panel-dark"
+        >
+          {isPlannedWorkoutOpen ? "Cancel" : "Plan a workout"}
+        </button>
         {isToday ? (
           <button
             type="button"
@@ -540,6 +592,20 @@ export default function DayView(): JSX.Element {
             className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent dark:bg-accent-dark dark:text-ink-primary dark:hover:bg-accent-dark disabled:opacity-50"
           >
             {logMacrosMutation.isPending ? "Saving..." : "Save macros"}
+          </button>
+        </div>
+      ) : null}
+
+      {isPlannedWorkoutOpen ? (
+        <div className="space-y-4 rounded-lg border border-line p-4 dark:border-line-dark">
+          <PlannedWorkoutForm onChange={setPlannedWorkoutValue} />
+          <button
+            type="button"
+            onClick={handleSubmitPlannedWorkout}
+            disabled={createPlannedWorkoutMutation.isPending}
+            className="focus-ring rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent dark:bg-accent-dark dark:text-ink-primary dark:hover:bg-accent-dark disabled:opacity-50"
+          >
+            {createPlannedWorkoutMutation.isPending ? "Saving..." : "Save planned workout"}
           </button>
         </div>
       ) : null}

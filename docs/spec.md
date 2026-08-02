@@ -1026,6 +1026,7 @@ Error codes agents should handle:
 - `template_not_found`
 - `intervals_unavailable` — sync failed
 - `invalid_timezone` — `PATCH /api/settings` received a value that isn't a valid IANA timezone name
+- `naive_datetime` — a timestamp field (e.g. `POST /api/planned-workouts` `start_at`) is missing a UTC offset
 
 ## Appendix D — Sequence: label scan → log
 

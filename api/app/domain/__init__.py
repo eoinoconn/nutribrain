@@ -18,6 +18,7 @@ from app.domain.dto import (
     MealItemSpec,
     MealResponse,
     PeriodTotals,
+    PlannedWorkoutDTO,
     RangeResponse,
     SetTargetResult,
     SyncIntervalsResult,
@@ -36,6 +37,7 @@ from app.domain.errors import (
     InvalidTimezoneError,
     MealItemNotFoundError,
     MealNotFoundError,
+    NaiveDatetimeError,
     ServingUnitImmutableError,
     TemplateNotFoundError,
     UnauthorizedError,
@@ -60,6 +62,7 @@ from app.domain.nutrition_math import (
     compute_item_macros,
     normalize_to_grams,
 )
+from app.domain.planned_workouts import create_manual_planned_workout
 from app.domain.settings import get_settings, update_settings
 from app.domain.targets import get_effective_target, list_targets, set_target
 from app.domain.templates import (
@@ -92,7 +95,9 @@ __all__ = [
     "MealItemSpec",
     "MealNotFoundError",
     "MealResponse",
+    "NaiveDatetimeError",
     "PeriodTotals",
+    "PlannedWorkoutDTO",
     "RangeResponse",
     "ServingUnitImmutableError",
     "SetTargetResult",
@@ -108,6 +113,7 @@ __all__ = [
     "UpdateFoodResult",
     "add_food",
     "compute_item_macros",
+    "create_manual_planned_workout",
     "create_template",
     "delete_food",
     "delete_meal",
