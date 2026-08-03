@@ -396,37 +396,6 @@ export interface ManualCaloriesOutResponse {
   fetchedAt: string;
 }
 
-// --- Planned workouts (api/app/api/planned_workouts.py) ---------------------
-
-export type PlannedWorkoutSource = "intervals_planned" | "intervals_completed" | "manual";
-
-export type PlannedWorkoutStatus = "planned" | "completed";
-
-/**
- * `POST /api/planned-workouts` (EC-04 manual fallback, §6): a lightweight
- * "plan a workout" entry (start time + estimated kcal) for days without an
- * intervals.icu event. The backend always writes `source: "manual"` — this
- * request never sends `source`, `sportType`, `icuJoules`, or
- * `actualCalories`, those are backend-only fields on synced rows.
- * `durationMinutes` isn't part of the small form (spec §6 only calls for
- * start time + estimated kcal); the backend defaults it when omitted.
- */
-export interface CreatePlannedWorkoutRequest {
-  startAt: string;
-  estimatedCalories: number;
-  durationMinutes?: number | null;
-}
-
-export interface PlannedWorkoutResponse {
-  id: number;
-  source: PlannedWorkoutSource;
-  localDate: string;
-  startAt: string;
-  durationMinutes: number;
-  estimatedCalories: number | null;
-  status: PlannedWorkoutStatus;
-}
-
 // --- Settings (api/app/api/settings.py) -------------------------------------
 
 export interface AppSettings {

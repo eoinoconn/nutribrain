@@ -7,9 +7,8 @@
 
 import { createItemKey, type MealEditorItem } from "../components/MealEditor/types";
 import type { MealEditorValue } from "../components/MealEditor";
-import type { PlannedWorkoutValue } from "../components/PlannedWorkoutForm/types";
 import type { QuickMacroValue } from "../components/QuickMacroEntry/types";
-import type { CreateMealRequest, CreatePlannedWorkoutRequest, MealItem, MealItemRequest, MealType } from "./api/types";
+import type { CreateMealRequest, MealItem, MealItemRequest, MealType } from "./api/types";
 
 export function mealEditorItemToRequest(item: MealEditorValue["items"][number]): MealItemRequest | null {
   if (item.quantity === null || item.quantity <= 0) {
@@ -101,36 +100,6 @@ export function buildQuickMacroRequest(value: QuickMacroValue, localDate: string
     localTz,
     mealType: value.mealType
   };
-}
-
-/**
- * Assembles the `POST /api/planned-workouts` request from `PlannedWorkoutForm`
- * state (EC-04, §6) for a given local date. Returns `null` (mirroring
- * `buildCreateMealRequest`'s "nothing to submit" signal) if estimated
- * calories haven't been entered yet — the only required field per the spec's
- * "start time + estimated kcal" minimal form. `durationMinutes` is only sent
- * when the user filled it in; omitted, the backend applies its own default.
- */
-export function buildCreatePlannedWorkoutRequest(
-  value: PlannedWorkoutValue,
-  localDate: string
-): CreatePlannedWorkoutRequest | null {
-  if (value.estimatedCalories === null) {
-    return null;
-  }
-  return {
-    startAt: buildLoggedAt(localDate, value.time),
-    estimatedCalories: value.estimatedCalories,
-    durationMinutes: value.durationMinutes
-  };
-}
-
-/** `HH:mm` (input[type=time]) extracted from an ISO datetime, in the browser's local time. */
-export function timeFromIso(iso: string): string {
-  const parsed = new Date(iso);
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
 }
 
 /**

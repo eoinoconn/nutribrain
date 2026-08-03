@@ -21,7 +21,6 @@ import type {
   CreateFoodRequest,
   CreateMealRequest,
   CreateMealResponse,
-  CreatePlannedWorkoutRequest,
   CreateTargetRequest,
   CreateTargetResponse,
   CreateTemplateRequest,
@@ -36,7 +35,6 @@ import type {
   ListTemplatesParams,
   LogTemplateRequest,
   ManualCaloriesOutResponse,
-  PlannedWorkoutResponse,
   RangeParams,
   RangeResponse,
   SetManualCaloriesOutRequest,
@@ -124,14 +122,6 @@ export function getRange(params: RangeParams): Promise<RangeResponse> {
     granularity: params.granularity
   });
   return getJson<RangeResponse>(`/api/range${query}`);
-}
-
-// --- Planned workouts (api/app/api/planned_workouts.py) --------------------
-
-export function createPlannedWorkout(
-  payload: CreatePlannedWorkoutRequest
-): Promise<PlannedWorkoutResponse> {
-  return sendJson<PlannedWorkoutResponse>("/api/planned-workouts", "POST", payload);
 }
 
 // --- Targets (api/app/api/targets.py) --------------------------------------
