@@ -29,6 +29,7 @@ async def test_mcp_lists_full_tool_surface_with_descriptions_and_schemas() -> No
         "get_day",
         "get_range",
         "find_food",
+        "find_foods",
         "list_templates",
         "get_target",
         "sync_intervals",

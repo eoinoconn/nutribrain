@@ -24,6 +24,7 @@ from app.domain import (
     add_food,
     compute_item_macros,
     delete_food,
+    find_foods,
     merge_food,
     search_foods,
     set_favorite_food,
@@ -343,3 +344,49 @@ class TestMergeFood:
         db_session.refresh(into_food)
         macros = compute_item_macros(item, into_food)
         assert macros.calories == Decimal("500")
+
+
+class TestFindFoods:
+    """MCP-07: batch food search, one round-trip for several item names."""
+
+    def test_find_foods_returns_one_result_per_query_with_own_candidates(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="Bagel")
+        make_food(name="Banana")
+        make_food(name="Oatmeal")
+
+        results = find_foods(db_session, queries=["bagel", "banana", "oatmeal"])
+
+        assert [r.query for r in results] == ["bagel", "banana", "oatmeal"]
+        assert any(c.food.name == "Bagel" for c in results[0].candidates)
+        assert any(c.food.name == "Banana" for c in results[1].candidates)
+        assert any(c.food.name == "Oatmeal" for c in results[2].candidates)
+
+    def test_find_foods_empty_queries_list_returns_empty_list(self, db_session: Session) -> None:
+        results = find_foods(db_session, queries=[])
+
+        assert results == []
+
+    def test_find_foods_query_with_no_matches_returns_empty_candidates_not_dropped(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="Bagel")
+
+        results = find_foods(db_session, queries=["bagel", "xyznonexistent"])
+
+        assert [r.query for r in results] == ["bagel", "xyznonexistent"]
+        assert results[1].candidates == []
+
+    def test_find_foods_applies_limit_per_query_not_globally(
+        self, db_session: Session, make_food
+    ) -> None:
+        for i in range(3):
+            make_food(name=f"Apple Variant {i}")
+        for i in range(3):
+            make_food(name=f"Pear Variant {i}")
+
+        results = find_foods(db_session, queries=["apple", "pear"], limit=2)
+
+        assert len(results[0].candidates) == 2
+        assert len(results[1].candidates) == 2

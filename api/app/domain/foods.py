@@ -48,6 +48,12 @@ class FoodSearchResult:
 
 
 @dataclass(frozen=True, slots=True)
+class FindFoodsResult:
+    query: str
+    candidates: list[FoodSearchResult]
+
+
+@dataclass(frozen=True, slots=True)
 class MergeFoodResult:
     into_food: Food
     from_food: Food
@@ -349,6 +355,30 @@ def search_foods(
             logged_count=int(row[2]),
         )
         for row in rows
+    ]
+
+
+def find_foods(
+    session: Session,
+    *,
+    queries: list[str],
+    limit: int = 20,
+) -> list[FindFoodsResult]:
+    """Batch food search: resolve several item names in one round-trip.
+
+    Thin wrapper over :func:`search_foods` — loops over ``queries`` within the
+    caller's session/transaction, applying ``limit`` per query rather than
+    globally. An empty ``queries`` list returns an empty list. A query with no
+    matches still appears in the result with an empty ``candidates`` list, so
+    the caller can tell "searched, found nothing" apart from "never searched."
+    """
+
+    return [
+        FindFoodsResult(
+            query=query,
+            candidates=search_foods(session, query=query, limit=limit),
+        )
+        for query in queries
     ]
 
 

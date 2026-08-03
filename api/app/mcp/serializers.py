@@ -30,7 +30,14 @@ from app.domain.dto import (
     TemplateResponse,
 )
 from app.domain.errors import DomainError
-from app.domain.foods import FoodSearchResult
+from app.domain.foods import FindFoodsResult, FoodSearchResult
+
+
+class FindFoodsResultModel(BaseModel):
+    """One query's candidates within a `find_foods` batch response."""
+
+    query: str
+    candidates: list[FoodSearchResponse]
 
 
 class ToolErrorResponse(BaseModel):
@@ -360,4 +367,11 @@ def serialize_food_search_result(value: FoodSearchResult) -> FoodSearchResponse:
         **FoodResponse.model_validate(value.food).model_dump(),
         last_logged_at=value.last_logged_at,
         logged_count=value.logged_count,
+    )
+
+
+def serialize_find_foods_result(value: FindFoodsResult) -> FindFoodsResultModel:
+    return FindFoodsResultModel(
+        query=value.query,
+        candidates=[serialize_food_search_result(item) for item in value.candidates],
     )

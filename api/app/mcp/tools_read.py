@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 
 from app.api.foods import FoodSearchResponse
 from app.domain import (
+    find_foods,
     find_meal,
     get_day,
     get_effective_target,
@@ -24,7 +25,7 @@ from app.domain.dto import (
     TemplateResponse,
 )
 from app.domain.errors import DomainError
-from app.domain.foods import FoodSearchResult
+from app.domain.foods import FindFoodsResult, FoodSearchResult
 from app.mcp._tool_common import capture_domain_error, run_with_session
 from app.mcp.date_args import (
     resolve_date_arg,
@@ -34,12 +35,14 @@ from app.mcp.date_args import (
 from app.mcp.serializers import (
     DayModel,
     EffectiveTargetModel,
+    FindFoodsResultModel,
     MealItemMatchModel,
     RangeModel,
     TemplateModel,
     ToolErrorResponse,
     serialize_day,
     serialize_effective_target,
+    serialize_find_foods_result,
     serialize_food_search_result,
     serialize_meal_item_match,
     serialize_range,
@@ -49,6 +52,7 @@ from app.mcp.serializers import (
 type GetDayResult = DayModel | ToolErrorResponse
 type GetRangeResult = RangeModel | ToolErrorResponse
 type FindFoodResult = list[FoodSearchResponse] | ToolErrorResponse
+type FindFoodsToolResult = list[FindFoodsResultModel] | ToolErrorResponse
 type FindMealResult = list[MealItemMatchModel] | ToolErrorResponse
 type ListTemplatesResult = list[TemplateModel] | ToolErrorResponse
 type GetTargetResult = EffectiveTargetModel | ToolErrorResponse | None
@@ -110,7 +114,9 @@ def register_read_tools(mcp: FastMCP) -> None:
         name="find_food",
         description=(
             "Search foods with favorite marker and usage metadata for resolution decisions. "
-            "Use this before guessing between multiple similar foods."
+            "Use this before guessing between multiple similar foods. Resolving several item "
+            "names at once (e.g. every item in a meal)? Use find_foods instead of one call per "
+            "name."
         ),
     )
     def find_food_tool(query: str, limit: int = 20) -> FindFoodResult:
@@ -122,6 +128,27 @@ def register_read_tools(mcp: FastMCP) -> None:
         except DomainError as exc:
             return capture_domain_error(exc)
         return [serialize_food_search_result(item) for item in result]
+
+    @mcp.tool(
+        name="find_foods",
+        description=(
+            "Batch food search: resolve several item names in one round-trip instead of "
+            "calling find_food once per item. Each result carries its originating query "
+            'alongside its own candidate list, e.g. {"query": "bagel", "candidates": [...]}, '
+            "so results stay attributable per input item. limit applies per query, not "
+            "globally. An empty queries list returns an empty list; a query with no matches "
+            "still appears with an empty candidates list."
+        ),
+    )
+    def find_foods_tool(queries: list[str], limit: int = 20) -> FindFoodsToolResult:
+        try:
+            result = cast(
+                list[FindFoodsResult],
+                run_with_session(find_foods, queries=queries, limit=limit),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return [serialize_find_foods_result(item) for item in result]
 
     @mcp.tool(
         name="find_meal",
