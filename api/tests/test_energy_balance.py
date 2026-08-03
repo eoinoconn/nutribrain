@@ -262,6 +262,82 @@ class TestNullEstimatedCaloriesExcluded:
         assert timeline.current_balance == round(-rate * Decimal(720))  # 12:00 = 720 min
 
 
+class TestNowOutsideDay:
+    """`now` is clamped into [local_midnight, local_end_of_day] for `day`
+    before use, so viewing a past or future day's energy timeline (not just
+    today's) produces a sensible line instead of a negative-duration walk.
+    """
+
+    def test_viewing_a_past_day_is_entirely_solid(
+        self, db_session: Session, make_target, make_meal, make_meal_item, make_food
+    ) -> None:
+        make_target(effective_from=DAY, base_calories=2400)
+        food = make_food(calories=Decimal("200"))
+        meal = make_meal(logged_at=datetime(2031, 11, 3, 8, 0, tzinfo=UTC), local_date=DAY)
+        make_meal_item(meal_id=meal.id, food=food, quantity=Decimal("100"))
+
+        # Real "now" is several days after DAY -- viewing a past day.
+        now = datetime(2031, 11, 8, 9, 0, tzinfo=UTC)
+        timeline = compute_energy_timeline(db_session, day=DAY, now=now)
+
+        # Nothing left to forecast -- current_balance already is the day's
+        # final balance, and the forecast segment is a degenerate single
+        # point rather than a negative-duration walk backwards.
+        assert timeline.current_balance == timeline.predicted_end_of_day
+        assert all(p.balance == timeline.current_balance for p in timeline.forecast_points)
+
+        rate = Decimal(2400) / Decimal(1440)
+        balance_at_meal = -rate * Decimal(480)  # 08:00 = 480 min
+        balance_after_meal = balance_at_meal + Decimal(200)
+        expected_eod = balance_after_meal - rate * Decimal(959)  # 08:00 -> 23:59 = 959 min
+        assert timeline.current_balance == round(expected_eod)
+
+    def test_viewing_a_future_day_is_entirely_forecast(
+        self, db_session: Session, make_target, make_meal, make_meal_item, make_food
+    ) -> None:
+        make_target(effective_from=date(2031, 1, 1), base_calories=2400)
+        food = make_food(calories=Decimal("400"))
+        meal = make_meal(logged_at=datetime(2031, 11, 3, 8, 0, tzinfo=UTC), local_date=DAY)
+        make_meal_item(meal_id=meal.id, food=food, quantity=Decimal("100"))
+
+        # Real "now" is days before DAY -- viewing a future day.
+        now = datetime(2031, 10, 29, 9, 0, tzinfo=UTC)
+        timeline = compute_energy_timeline(db_session, day=DAY, now=now)
+
+        # Nothing has happened yet on that day -- the solid line is a
+        # degenerate single point at local midnight, balance 0.
+        assert timeline.current_balance == 0
+        assert all(p.balance == 0 for p in timeline.points)
+
+        rate = Decimal(2400) / Decimal(1440)
+        balance_at_meal = -rate * Decimal(480)
+        balance_after_meal = balance_at_meal + Decimal(400)
+        expected_eod = balance_after_meal - rate * Decimal(959)
+        assert timeline.predicted_end_of_day == round(expected_eod)
+
+    def test_grace_period_uses_real_now_not_the_day_clamped_now(
+        self, db_session: Session, make_target
+    ) -> None:
+        # start_at is late in DAY, so the day-clamped "now" (23:59 on DAY)
+        # would still be inside the 4h grace window -- but the *real* now,
+        # several days later, is well past it. The workout must be dropped.
+        start_at = datetime(2031, 11, 3, 23, 0, tzinfo=UTC)
+        _make_workout(
+            db_session,
+            status=PlannedWorkoutStatus.planned,
+            source=PlannedWorkoutSource.intervals_planned,
+            start_at=start_at,
+            icu_joules=4000,
+            estimated_calories=280,
+        )
+        make_target(effective_from=DAY, base_calories=2400)
+
+        now = datetime(2031, 11, 8, 9, 0, tzinfo=UTC)
+        timeline = compute_energy_timeline(db_session, day=DAY, now=now)
+
+        assert timeline.events == []
+
+
 class TestFuelingFlags:
     def test_well_fueled_when_balance_positive_at_start_at(
         self, db_session: Session, make_target, make_meal, make_meal_item, make_food

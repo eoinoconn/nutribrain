@@ -532,14 +532,12 @@ export default function DayView(): JSX.Element {
       <div aria-busy={isRefetching} className={`space-y-8 transition-opacity ${isRefetching ? "opacity-50" : "opacity-100"}`}>
         <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
 
-        {isToday ? (
-          <section aria-labelledby="live-energy-heading" className="space-y-3">
-            <h2 id="live-energy-heading" className="text-lg font-semibold">
-              Live Energy
-            </h2>
-            <EnergyChart energy={day.energy} isLoading={dayQuery.isLoading} />
-          </section>
-        ) : null}
+        <section aria-labelledby="live-energy-heading" className="space-y-3">
+          <h2 id="live-energy-heading" className="text-lg font-semibold">
+            {isToday ? "Live Energy" : "Energy Balance"}
+          </h2>
+          <EnergyChart energy={day.energy} isLoading={dayQuery.isLoading} isToday={isToday} />
+        </section>
 
         <div className="flex flex-wrap gap-3">
         <button

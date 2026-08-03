@@ -60,6 +60,34 @@ function formatTimeMs(ms: number): string {
   return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+/** Recharts' default numeric-axis ticks are evenly spaced by *count* across
+ * the domain, not snapped to any meaningful boundary — for a ~24h domain
+ * that lands on arbitrary times like "7:56 AM" instead of round hours.
+ * Builds ticks on the hour instead, spaced so there are roughly 5-7 of them
+ * regardless of how long the domain span is. */
+function computeHourTicks(minMs: number, maxMs: number): number[] {
+  if (!(maxMs > minMs)) {
+    return [minMs];
+  }
+  const spanHours = (maxMs - minMs) / HOUR_MS;
+  const stepHours = spanHours > 18 ? 4 : spanHours > 9 ? 2 : 1;
+  const stepMs = stepHours * HOUR_MS;
+
+  const first = new Date(minMs);
+  first.setMinutes(0, 0, 0);
+  if (first.getTime() < minMs) {
+    first.setHours(first.getHours() + stepHours);
+  }
+
+  const ticks: number[] = [];
+  for (let t = first.getTime(); t <= maxMs; t += stepMs) {
+    ticks.push(t);
+  }
+  return ticks.length > 0 ? ticks : [minMs];
+}
+
 /** Categorical, non-alarming copy for each fueling status — never a bare signed number. */
 const FUELING_LABELS: Record<FuelingFlag["status"], string> = {
   well_fueled: "Well fueled",
@@ -223,13 +251,22 @@ function EventLegend(): JSX.Element {
   );
 }
 
-function EnergyTextSummary({ energy }: { energy: EnergyTimeline }): JSX.Element {
+function EnergyTextSummary({ energy, isToday }: { energy: EnergyTimeline; isToday: boolean }): JSX.Element {
   return (
     <div className="space-y-2 text-sm text-ink-secondary dark:text-ink-secondary-dark">
       <p>
-        Current energy balance is {formatCalories(energy.currentBalance)} calories. Predicted end of day:{" "}
-        {formatCalories(energy.predictedEndOfDay)} calories, against a target of{" "}
-        {formatCalories(energy.endOfDayTarget)} calories.
+        {isToday ? (
+          <>
+            Current energy balance is {formatCalories(energy.currentBalance)} calories. Predicted end of day:{" "}
+            {formatCalories(energy.predictedEndOfDay)} calories, against a target of{" "}
+            {formatCalories(energy.endOfDayTarget)} calories.
+          </>
+        ) : (
+          <>
+            Energy balance for the day is {formatCalories(energy.predictedEndOfDay)} calories, against a target of{" "}
+            {formatCalories(energy.endOfDayTarget)} calories.
+          </>
+        )}
       </p>
       {energy.fuelingFlags.length > 0 ? (
         <ul className="space-y-1">
@@ -250,13 +287,19 @@ function EnergyTextSummary({ energy }: { energy: EnergyTimeline }): JSX.Element 
 export interface EnergyChartProps {
   energy: EnergyTimeline | null;
   isLoading: boolean;
+  /** Whether the viewed day is today. The "now" reference line and its
+   * "Live Energy" label only make sense for today — compute_energy_timeline
+   * clamps its solid/dashed split to the viewed day's own bounds for any
+   * other date (EC-05), so a past day is already fully solid and a future
+   * day fully forecast; there's no meaningful "now" point to mark on either. */
+  isToday: boolean;
 }
 
 /**
- * Standalone, prop-driven energy balance chart. Not wired into `DayView.tsx`
- * yet (EC-10) — this component only renders whatever it's handed.
+ * Standalone, prop-driven energy balance chart. Data-fetching and the
+ * isToday determination both belong to the caller (`DayView.tsx`).
  */
-export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JSX.Element {
+export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartProps): JSX.Element {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -276,17 +319,19 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
   const rowTimes = rows.map((row) => row.at);
   const domain: [number, number] | undefined =
     rowTimes.length > 0 ? [Math.min(...rowTimes), Math.max(...rowTimes)] : undefined;
+  const ticks = domain ? computeHourTicks(domain[0], domain[1]) : undefined;
   const eventData = buildEventScatterData(energy.events, rows);
 
   return (
     <div className="space-y-3">
       <div className="h-64 w-full" role="img" aria-label="Line chart of energy balance for the day, actual and forecast">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+          <ComposedChart data={rows} margin={{ top: 28, right: 24, left: 0, bottom: 8 }}>
             <XAxis
               dataKey="at"
               type="number"
               domain={domain ?? ["dataMin", "dataMax"]}
+              ticks={ticks}
               tickFormatter={formatTimeMs}
               tick={{ fontSize: 12 }}
             />
@@ -299,7 +344,7 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
                   : [formatCalories(Number(value)), name]
               }
             />
-            {nowAtMs !== null ? (
+            {isToday && nowAtMs !== null ? (
               <ReferenceLine
                 x={nowAtMs}
                 stroke={NOW_LINE_COLOR}
@@ -313,7 +358,7 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
               />
             ) : null}
             <Line
-              type="monotone"
+              type="linear"
               dataKey="actualBalance"
               name="So far"
               stroke={BALANCE_COLOR}
@@ -323,7 +368,7 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
               isAnimationActive={false}
             />
             <Line
-              type="monotone"
+              type="linear"
               dataKey="forecastBalance"
               name="Forecast"
               stroke={FORECAST_COLOR}
@@ -340,7 +385,7 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
         </ResponsiveContainer>
       </div>
       {energy.events.length > 0 ? <EventLegend /> : null}
-      <EnergyTextSummary energy={energy} />
+      <EnergyTextSummary energy={energy} isToday={isToday} />
     </div>
   );
 }

@@ -264,18 +264,19 @@ describe("DayView", () => {
       };
     }
 
-    it("renders the Live Energy section on today's date when energy data is present", async () => {
+    it("renders a Live Energy section on today's date when energy data is present", async () => {
       mockedGetDay.mockResolvedValue(makeDay({ date: todayIso(), energy: makeEnergy() }));
       renderPage("/");
 
       expect(await screen.findByRole("heading", { name: /live energy/i })).toBeInTheDocument();
     });
 
-    it("does not render the Live Energy section on a non-today date", async () => {
+    it("renders an Energy Balance section (not gated on isToday) on a non-today date", async () => {
       mockedGetDay.mockResolvedValue(makeDay({ date: "2026-07-20", energy: makeEnergy() }));
       renderPage("/day/2026-07-20");
 
       await screen.findByText("no meals logged this day");
+      expect(screen.getByRole("heading", { name: /energy balance/i })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: /live energy/i })).not.toBeInTheDocument();
     });
   });

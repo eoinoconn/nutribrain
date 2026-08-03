@@ -92,9 +92,20 @@ def compute_energy_timeline(session: Session, *, day: date, now: datetime) -> En
         session: Active SQLAlchemy session.
         day: The local_date to compute the timeline for.
         now: Timezone-aware "current instant" — solid/dashed split point.
+            Clamped into ``[local_midnight, local_end_of_day]`` for ``day``
+            before use (see ``effective_now`` below) — the caller always
+            passes the real wall-clock now regardless of which day is being
+            viewed (§8's Day detail route works for any date), and the
+            solid/dashed walk is only well-defined when the split point
+            falls inside the day it's splitting.
 
     Returns:
-        EnergyTimeline per §5.
+        EnergyTimeline per §5. For a day fully in the past, this clamps to
+        the day's own end: the whole line is solid (nothing left to
+        forecast) and ``current_balance`` reads as the day's final balance.
+        For a day fully in the future, it clamps to the day's own start:
+        the whole line is forecast (dashed) and ``current_balance`` is the
+        balance before anything on that day has happened.
 
     Raises:
         NaiveDatetimeError: If ``now`` is not timezone-aware.
@@ -113,6 +124,13 @@ def compute_energy_timeline(session: Session, *, day: date, now: datetime) -> En
     # taken literally rather than rounding up to the next midnight.
     local_end_of_day = datetime.combine(day, time(23, 59), tzinfo=tz)
 
+    # The real "now" only makes sense as a split point when it falls inside
+    # the viewed day. Clamping it here (rather than requiring every caller
+    # to do so) keeps compute_energy_timeline correct for any day on its
+    # own, matching how get_day already calls it unconditionally regardless
+    # of date (EC-08).
+    effective_now = max(local_midnight, min(now, local_end_of_day))
+
     effective_target = get_effective_target(session, day=day)
     if effective_target is None:
         raise NoTargetSetError(day)
@@ -120,21 +138,26 @@ def compute_energy_timeline(session: Session, *, day: date, now: datetime) -> En
     # Negative: basal metabolism drains the balance over time (§5 step 1).
     basal_rate_per_minute = -Decimal(effective_target.base_calories) / Decimal(1440)
 
+    # Grace-period expiry (§5 step 3) is about real elapsed time since a
+    # workout's start -- "has this had a chance to sync since" -- so it uses
+    # the real now, not the day-clamped effective_now: a stale planned
+    # workout from a past day should read as skipped regardless of which
+    # day's timeline is being viewed, not just when viewing today's.
     steps = _build_steps(session, day=day, now=now)
     steps.sort(key=lambda s: s.at)
 
-    solid_steps = [s for s in steps if s.at <= now]
-    forecast_steps = [s for s in steps if s.at > now]
+    solid_steps = [s for s in steps if s.at <= effective_now]
+    forecast_steps = [s for s in steps if s.at > effective_now]
 
     solid_points, balance_at_now, _ = _walk_segment(
         start_at=local_midnight,
         start_balance=Decimal(0),
-        end_at=now,
+        end_at=effective_now,
         steps=solid_steps,
         basal_rate_per_minute=basal_rate_per_minute,
     )
     forecast_points, balance_at_eod, forecast_step_balances = _walk_segment(
-        start_at=now,
+        start_at=effective_now,
         start_balance=balance_at_now,
         end_at=local_end_of_day,
         steps=forecast_steps,
