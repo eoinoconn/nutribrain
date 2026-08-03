@@ -340,6 +340,58 @@ class TestListTemplates:
         assert "Template A" in names
         assert "Template B" in names
 
+    def test_default_include_items_true_returns_full_items(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        created = create_template(
+            db_session,
+            name="Template With Items",
+            items=[
+                TemplateItemSpec(
+                    name="Oats",
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                ),
+            ],
+        )
+
+        templates = list_templates(db_session)
+        match = next(t for t in templates if t.id == created.id)
+        assert len(match.items) == 1
+        assert match.items[0].food_id == sample_food.id
+
+    def test_include_items_false_skips_item_load(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        created = create_template(
+            db_session,
+            name="Template Summary Mode",
+            items=[
+                TemplateItemSpec(
+                    name="Oats",
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                ),
+            ],
+        )
+
+        templates = list_templates(db_session, include_items=False)
+        match = next(t for t in templates if t.id == created.id)
+        assert match.items == []
+        assert match.name == "Template Summary Mode"
+
+    def test_empty_template_items_both_modes(self, db_session: Session) -> None:
+        created = create_template(db_session, name="Empty Template", items=[])
+
+        full = next(t for t in list_templates(db_session) if t.id == created.id)
+        summary = next(
+            t for t in list_templates(db_session, include_items=False) if t.id == created.id
+        )
+        assert full.items == []
+        assert summary.items == []
+
 
 class TestLogTemplate:
     def test_log_food_backed_items(

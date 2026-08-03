@@ -107,22 +107,27 @@ def delete_template(
     return _template_to_response(template)
 
 
-def list_templates(session: Session, *, query: str = "") -> list[TemplateResponse]:
-    """Return non-deleted templates, optionally filtered by name substring."""
+def list_templates(
+    session: Session, *, query: str = "", include_items: bool = True
+) -> list[TemplateResponse]:
+    """Return non-deleted templates, optionally filtered by name substring.
 
-    stmt = (
-        select(Template)
-        .where(Template.deleted_at.is_(None))
-        .options(selectinload(Template.items))
-        .order_by(Template.id)
-    )
+    When ``include_items`` is False, template items are not eager-loaded from
+    the database at all (no ``selectinload``) — the returned responses carry
+    an empty ``items`` list. This is a genuine efficiency win for callers that
+    only need id + name to pick a template, not just a smaller payload.
+    """
+
+    stmt = select(Template).where(Template.deleted_at.is_(None)).order_by(Template.id)
+    if include_items:
+        stmt = stmt.options(selectinload(Template.items))
 
     lowered = query.strip().lower()
     if lowered:
         stmt = stmt.where(func.lower(Template.name).contains(lowered))
 
     templates = session.scalars(stmt).all()
-    return [_template_to_response(t) for t in templates]
+    return [_template_to_response(t, include_items=include_items) for t in templates]
 
 
 def log_template(
@@ -349,8 +354,12 @@ def _scale_macro(value: Decimal | None, scale: Decimal) -> Decimal | None:
     return value * scale
 
 
-def _template_to_response(template: Template) -> TemplateResponse:
-    """Convert a Template ORM object to a TemplateResponse DTO."""
+def _template_to_response(template: Template, *, include_items: bool = True) -> TemplateResponse:
+    """Convert a Template ORM object to a TemplateResponse DTO.
+
+    When ``include_items`` is False, ``template.items`` is not accessed at all
+    (avoids triggering a lazy-load query) and the response's ``items`` is [].
+    """
 
     return TemplateResponse(
         id=template.id,
@@ -373,5 +382,7 @@ def _template_to_response(template: Template) -> TemplateResponse:
                 sodium_mg=ti.sodium_mg,
             )
             for ti in template.items
-        ],
+        ]
+        if include_items
+        else [],
     )

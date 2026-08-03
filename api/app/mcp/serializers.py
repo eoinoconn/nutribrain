@@ -112,7 +112,7 @@ class TemplateModel(BaseModel):
     name: str
     created_at: datetime
     deleted_at: datetime | None
-    items: list[TemplateItemModel]
+    items: list[TemplateItemModel] | None = None
 
 
 class EffectiveTargetModel(BaseModel):
@@ -266,13 +266,13 @@ def serialize_template_item(value: TemplateItemResponse) -> TemplateItemModel:
     )
 
 
-def serialize_template(value: TemplateResponse) -> TemplateModel:
+def serialize_template(value: TemplateResponse, *, include_items: bool = True) -> TemplateModel:
     return TemplateModel(
         id=value.id,
         name=value.name,
         created_at=value.created_at,
         deleted_at=value.deleted_at,
-        items=[serialize_template_item(item) for item in value.items],
+        items=[serialize_template_item(item) for item in value.items] if include_items else None,
     )
 
 

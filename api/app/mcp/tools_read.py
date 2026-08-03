@@ -173,13 +173,23 @@ def register_read_tools(mcp: FastMCP) -> None:
             return capture_domain_error(exc)
         return [serialize_meal_item_match(item) for item in result]
 
-    @mcp.tool(name="list_templates", description="List all non-deleted templates with full items.")
-    def list_templates_tool() -> ListTemplatesResult:
+    @mcp.tool(
+        name="list_templates",
+        description=(
+            "List all non-deleted templates. By default returns id + name only "
+            "(lightweight, no items loaded); pass include_items=True for full "
+            "item detail on every template."
+        ),
+    )
+    def list_templates_tool(include_items: bool = False) -> ListTemplatesResult:
         try:
-            result = cast(list[TemplateResponse], run_with_session(list_templates))
+            result = cast(
+                list[TemplateResponse],
+                run_with_session(list_templates, include_items=include_items),
+            )
         except DomainError as exc:
             return capture_domain_error(exc)
-        return [serialize_template(item) for item in result]
+        return [serialize_template(item, include_items=include_items) for item in result]
 
     @mcp.tool(
         name="get_target",
