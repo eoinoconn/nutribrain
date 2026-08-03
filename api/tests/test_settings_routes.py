@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app import settings as settings_module
-from app.db import get_session
+from app.db import AppSettings, get_session
 from app.main import create_app
 
 
@@ -29,8 +29,23 @@ def _override_session(db_session: Session):
     return _dependency
 
 
+def _clear_app_settings(session: Session) -> None:
+    """See test_settings.py's helper of the same name: this suite runs
+    against a shared dev DB, and the id=1 settings singleton is real account
+    data that can already exist, so "returns the default" tests must clear
+    it first (within this test's own rolled-back transaction) rather than
+    assume no row is present.
+    """
+
+    row = session.get(AppSettings, 1)
+    if row is not None:
+        session.delete(row)
+        session.flush()
+
+
 class TestSettingsRoutes:
     def test_get_settings_returns_default_utc(self, db_session: Session) -> None:
+        _clear_app_settings(db_session)
         app = create_app(include_mcp_mount=False)
         app.dependency_overrides[get_session] = _override_session(db_session)
         try:

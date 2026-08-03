@@ -17,12 +17,31 @@ from app.domain.errors import InvalidTimezoneError
 from app.domain.settings import get_settings, update_settings
 
 
+def _clear_app_settings(session: Session) -> None:
+    """Delete the singleton row, if any, within the test's own (rolled-back)
+    transaction. This suite runs against a shared dev DB (not an ephemeral
+    one per run), and the id=1 singleton is real, durable account data --
+    other test runs (or a real settings change made outside this suite) can
+    leave a row committed that these "no row yet" tests otherwise assume
+    doesn't exist. Deleting it here, scoped to this test's own transaction,
+    makes the precondition explicit and deterministic regardless of what's
+    actually stored for the real account.
+    """
+
+    row = session.get(AppSettings, 1)
+    if row is not None:
+        session.delete(row)
+        session.flush()
+
+
 class TestGetSettings:
     def test_no_row_yet_returns_default_utc(self, db_session: Session) -> None:
+        _clear_app_settings(db_session)
         result = get_settings(db_session)
         assert result.local_timezone == "UTC"
 
     def test_lazily_creates_the_singleton_row(self, db_session: Session) -> None:
+        _clear_app_settings(db_session)
         get_settings(db_session)
         row = db_session.get(AppSettings, 1)
         assert row is not None
