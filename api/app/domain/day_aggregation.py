@@ -7,7 +7,7 @@ foods are loaded in a fixed number of queries regardless of data volume.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -23,24 +23,42 @@ from app.domain.dto import (
     PeriodTotals,
     RangeResponse,
 )
+from app.domain.energy_balance import compute_energy_timeline
+from app.domain.errors import NoTargetSetError
 from app.domain.nutrition_math import compute_item_macros
 from app.domain.targets import get_effective_target, resolve_calories_out_map
 
 
-def get_day(session: Session, *, day: date) -> DayResponse:
+def get_day(session: Session, *, day: date, now: datetime | None = None) -> DayResponse:
     """Aggregate a single day: meals grouped by type, totals, target, delta.
 
     Loads meals + items + foods in bounded queries (no N+1). Macros are computed
     at read time from the current food nutrition values.
 
+    Also folds in the Live Energy timeline (EC-05/EC-08, §7) as the ``energy``
+    field. This mirrors ``effective_target``/``delta_vs_target``'s existing
+    graceful handling of a missing target: rather than letting
+    ``compute_energy_timeline``'s ``NoTargetSetError`` fail the whole day
+    request, ``energy`` is simply ``None`` when no target is set for ``day``.
+    ``compute_energy_timeline`` itself makes sense for any day (past, today,
+    or future) -- the "only meaningful for today" gating is a frontend (§8)
+    concern, not a domain one.
+
     Args:
         session: Active SQLAlchemy session.
         day: The local_date to aggregate.
+        now: Timezone-aware "current instant" used as the energy timeline's
+            solid/dashed split point (defaults to UTC now, following this
+            codebase's existing ``now: datetime | None = None`` convention,
+            e.g. ``meal_logging.log_meal``, ``intervals_sync.sync_intervals``).
 
     Returns:
         DayResponse with meals grouped by meal_type, day totals, effective
-        target, and delta vs. target.
+        target, delta vs. target, and the energy timeline (or None if no
+        target is set for the day).
     """
+
+    resolved_now = now or datetime.now(UTC)
 
     # One query: meals with items eagerly loaded for this day
     meals = _load_meals_for_dates(session, day, day)
@@ -82,12 +100,18 @@ def get_day(session: Session, *, day: date) -> DayResponse:
             sodium_mg=day_totals.sodium_mg,
         )
 
+    try:
+        energy = compute_energy_timeline(session, day=day, now=resolved_now)
+    except NoTargetSetError:
+        energy = None
+
     return DayResponse(
         date=day,
         meals=grouped,
         day_totals=day_totals,
         effective_target=effective_target,
         delta_vs_target=delta,
+        energy=energy,
     )
 
 

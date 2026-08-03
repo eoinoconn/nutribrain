@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict
@@ -65,12 +65,49 @@ class EffectiveTargetSchema(BaseModel):
     effective_calories: int
 
 
+class EnergyPointSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    at: datetime
+    balance: int
+
+
+class EnergyEventSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    at: datetime
+    delta_kcal: int
+    kind: Literal["meal", "workout"]
+    status: Literal["planned", "completed"] | None = None
+
+
+class FuelingFlagSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workout_id: int
+    at: datetime
+    status: Literal["well_fueled", "under_fueled"]
+
+
+class EnergyTimelineSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    points: list[EnergyPointSchema]
+    forecast_points: list[EnergyPointSchema]
+    events: list[EnergyEventSchema]
+    current_balance: int
+    predicted_end_of_day: int
+    end_of_day_target: int
+    fueling_flags: list[FuelingFlagSchema]
+
+
 class DayResponseSchema(BaseModel):
     date: date
     meals: dict[str, list[DayMealGroupSchema]]
     day_totals: ItemMacrosSchema
     effective_target: EffectiveTargetSchema | None = None
     delta_vs_target: ItemMacrosSchema | None = None
+    energy: EnergyTimelineSchema | None = None
 
 
 class PeriodTotalsSchema(BaseModel):
@@ -138,6 +175,11 @@ def read_day(
         delta_vs_target=(
             ItemMacrosSchema.model_validate(result.delta_vs_target, from_attributes=True)
             if result.delta_vs_target is not None
+            else None
+        ),
+        energy=(
+            EnergyTimelineSchema.model_validate(result.energy, from_attributes=True)
+            if result.energy is not None
             else None
         ),
     )

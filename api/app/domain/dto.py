@@ -185,13 +185,21 @@ class DayMealGroup:
 
 @dataclass(frozen=True, slots=True)
 class DayResponse:
-    """Full day aggregation: meals grouped by type, totals, target, delta."""
+    """Full day aggregation: meals grouped by type, totals, target, delta.
+
+    ``energy`` (EC-08, §7) is the Live Energy timeline for the day, or
+    ``None`` when no target is set -- ``compute_energy_timeline`` raises
+    ``NoTargetSetError`` in that case, which ``get_day`` catches and
+    translates to ``None`` here, mirroring how ``effective_target`` /
+    ``delta_vs_target`` already tolerate a missing target gracefully.
+    """
 
     date: date
     meals: dict[MealType, list[DayMealGroup]]
     day_totals: ItemMacros
     effective_target: EffectiveTarget | None
     delta_vs_target: ItemMacros | None
+    energy: EnergyTimeline | None
 
 
 @dataclass(frozen=True, slots=True)
