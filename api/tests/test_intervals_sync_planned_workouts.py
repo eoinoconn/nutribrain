@@ -28,9 +28,18 @@ from app.domain.intervals_sync import sync_intervals
 from app.domain.planned_workouts import sync_planned_workouts
 from app.intervals.client import ActivityDetail, PlannedEventDetail
 
-_FROM = date(2026, 8, 1)
-_TO = date(2026, 8, 5)
-_NOW = datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
+# A far-future, distinctive range: this suite runs against a shared dev
+# Neon database (see api/.env), not an ephemeral one per run, and real
+# synced planned_workouts rows already exist around the actual current
+# date (confirmed: a real `intervals_planned` row for today collided with
+# this range when it was 2026-08-01..05, making count-based assertions
+# here wrong -- each test's own transaction still rolled back cleanly, so
+# nothing was permanently lost, but the *assertions* saw real rows
+# alongside the test's own). Matches the convention `test_energy_balance.py`
+# already uses for the same reason.
+_FROM = date(2031, 8, 1)
+_TO = date(2031, 8, 5)
+_NOW = datetime(2031, 8, 5, 12, 0, tzinfo=UTC)
 
 
 def _row(
@@ -44,7 +53,19 @@ def _row(
 
 
 def _all_rows(db_session: Session) -> list[PlannedWorkout]:
-    return list(db_session.scalars(select(PlannedWorkout)))
+    """Rows within this suite's own [_FROM, _TO] range only -- an unscoped
+    `select(PlannedWorkout)` counts every row in the shared dev DB,
+    including real committed rows around the actual current date (see the
+    `_FROM`/`_TO` comment above for why that's a real, confirmed collision).
+    """
+
+    return list(
+        db_session.scalars(
+            select(PlannedWorkout).where(
+                PlannedWorkout.local_date >= _FROM, PlannedWorkout.local_date <= _TO
+            )
+        )
+    )
 
 
 class TestEstimateWorkoutCalories:
@@ -57,7 +78,7 @@ class TestSyncPlannedWorkoutsUpsert:
     def test_resync_upserts_rather_than_duplicates(self, db_session: Session) -> None:
         event = PlannedEventDetail(
             external_id="e1",
-            start_date_local="2026-08-05T06:00:00",
+            start_date_local="2031-08-05T06:00:00",
             duration_minutes=90.0,
             sport_type="Ride",
             icu_joules=2100000.0,
@@ -92,7 +113,7 @@ class TestSyncPlannedWorkoutsUpsert:
     ) -> None:
         event = PlannedEventDetail(
             external_id="e-structured",
-            start_date_local="2026-08-03T07:00:00",
+            start_date_local="2031-08-03T07:00:00",
             duration_minutes=60.0,
             sport_type="Run",
             icu_joules=1000000.0,
@@ -118,7 +139,7 @@ class TestSyncPlannedWorkoutsUpsert:
     def test_planned_event_without_icu_joules_gets_null_estimate(self, db_session: Session) -> None:
         event = PlannedEventDetail(
             external_id="e-placeholder",
-            start_date_local="2026-08-03T07:00:00",
+            start_date_local="2031-08-03T07:00:00",
             duration_minutes=45.0,
             sport_type="Run",
             icu_joules=None,
@@ -146,7 +167,7 @@ class TestSyncPlannedWorkoutsUpsert:
     ) -> None:
         activity = ActivityDetail(
             external_id="a1",
-            start_date_local="2026-08-02T06:00:00",
+            start_date_local="2031-08-02T06:00:00",
             duration_minutes=55.0,
             sport_type="Ride",
             calories=712,
@@ -175,7 +196,7 @@ class TestPlannedToCompletedFlip:
     def test_previously_planned_row_flips_to_completed(self, db_session: Session) -> None:
         event = PlannedEventDetail(
             external_id="shared-1",
-            start_date_local="2026-08-04T06:00:00",
+            start_date_local="2031-08-04T06:00:00",
             duration_minutes=90.0,
             sport_type="Ride",
             icu_joules=1800000.0,
@@ -184,7 +205,7 @@ class TestPlannedToCompletedFlip:
             db_session,
             from_date=_FROM,
             to_date=_TO,
-            now=datetime(2026, 8, 3, 12, 0, tzinfo=UTC),
+            now=datetime(2031, 8, 3, 12, 0, tzinfo=UTC),
             fetch_activities=lambda *, oldest, newest: [],
             fetch_planned=lambda *, oldest, newest: [event],
         )
@@ -196,7 +217,7 @@ class TestPlannedToCompletedFlip:
 
         activity = ActivityDetail(
             external_id="shared-1",
-            start_date_local="2026-08-04T06:05:00",
+            start_date_local="2031-08-04T06:05:00",
             duration_minutes=88.0,
             sport_type="Ride",
             calories=980,
@@ -232,7 +253,7 @@ class TestPlannedToCompletedFlip:
     ) -> None:
         activity = ActivityDetail(
             external_id="shared-2",
-            start_date_local="2026-08-04T06:00:00",
+            start_date_local="2031-08-04T06:00:00",
             duration_minutes=60.0,
             sport_type="Run",
             calories=500,
@@ -250,7 +271,7 @@ class TestPlannedToCompletedFlip:
         # stale calendar entry that hasn't dropped off yet.
         event = PlannedEventDetail(
             external_id="shared-2",
-            start_date_local="2026-08-04T06:00:00",
+            start_date_local="2031-08-04T06:00:00",
             duration_minutes=60.0,
             sport_type="Run",
             icu_joules=900000.0,
@@ -277,18 +298,154 @@ class TestPlannedToCompletedFlip:
         )
 
 
+class TestStalePlannedRemoval:
+    """EC-12: a planned row whose event disappears from intervals.icu should
+    disappear from the app too, on the next sync covering its date.
+    """
+
+    def test_planned_row_removed_when_event_no_longer_returned(self, db_session: Session) -> None:
+        event = PlannedEventDetail(
+            external_id="vanishing",
+            start_date_local="2031-08-03T07:00:00",
+            duration_minutes=60.0,
+            sport_type="Run",
+            icu_joules=1000000.0,
+        )
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [],
+            fetch_planned=lambda *, oldest, newest: [event],
+        )
+        assert (
+            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="vanishing")
+            is not None
+        )
+
+        # Re-sync the same range; intervals.icu no longer returns this event
+        # (deleted upstream).
+        result = sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [],
+            fetch_planned=lambda *, oldest, newest: [],
+        )
+
+        assert (
+            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="vanishing")
+            is None
+        )
+        assert result.stale_planned_removed == 1
+
+    def test_manual_row_is_never_removed_by_a_sync(self, db_session: Session) -> None:
+        manual = PlannedWorkout(
+            external_id=None,
+            source=PlannedWorkoutSource.manual,
+            local_date=date(2031, 8, 3),
+            start_at=datetime(2031, 8, 3, 7, 0, tzinfo=UTC),
+            duration_minutes=60,
+            sport_type=None,
+            icu_joules=None,
+            estimated_calories=400,
+            actual_calories=None,
+            status=PlannedWorkoutStatus.planned,
+            fetched_at=_NOW,
+        )
+        db_session.add(manual)
+        db_session.flush()
+
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [],
+            fetch_planned=lambda *, oldest, newest: [],
+        )
+
+        assert db_session.get(PlannedWorkout, manual.id) is not None
+
+    def test_completed_row_is_never_removed_by_a_sync_with_no_events(
+        self, db_session: Session
+    ) -> None:
+        activity = ActivityDetail(
+            external_id="stays-completed",
+            start_date_local="2031-08-02T06:00:00",
+            duration_minutes=55.0,
+            sport_type="Ride",
+            calories=500,
+        )
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [activity],
+            fetch_planned=lambda *, oldest, newest: [],
+        )
+
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [],
+            fetch_planned=lambda *, oldest, newest: [],
+        )
+
+        row = _row(
+            db_session,
+            source=PlannedWorkoutSource.intervals_completed,
+            external_id="stays-completed",
+        )
+        assert row is not None
+        assert row.status == PlannedWorkoutStatus.completed
+
+    def test_planned_row_outside_the_synced_range_is_untouched(self, db_session: Session) -> None:
+        outside_range = PlannedWorkout(
+            external_id="outside",
+            source=PlannedWorkoutSource.intervals_planned,
+            local_date=date(2031, 9, 1),
+            start_at=datetime(2031, 9, 1, 7, 0, tzinfo=UTC),
+            duration_minutes=60,
+            sport_type="Run",
+            icu_joules=1000000,
+            estimated_calories=1100,
+            actual_calories=None,
+            status=PlannedWorkoutStatus.planned,
+            fetched_at=_NOW,
+        )
+        db_session.add(outside_range)
+        db_session.flush()
+
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [],
+            fetch_planned=lambda *, oldest, newest: [],
+        )
+
+        assert db_session.get(PlannedWorkout, outside_range.id) is not None
+
+
 class TestSyncIntervalsWiresPlannedWorkouts:
     def test_sync_intervals_also_upserts_planned_workouts(self, db_session: Session) -> None:
         event = PlannedEventDetail(
             external_id="wired-1",
-            start_date_local="2026-08-02T06:00:00",
+            start_date_local="2031-08-02T06:00:00",
             duration_minutes=30.0,
             sport_type="Swim",
             icu_joules=300000.0,
         )
         activity = ActivityDetail(
             external_id="wired-2",
-            start_date_local="2026-08-01T06:00:00",
+            start_date_local="2031-08-01T06:00:00",
             duration_minutes=40.0,
             sport_type="Run",
             calories=350,

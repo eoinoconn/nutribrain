@@ -179,10 +179,11 @@ _FALLBACK_DURATION_MINUTES = 0
 
 @dataclass(frozen=True, slots=True)
 class PlannedWorkoutsSyncResult:
-    """Result of one ``sync_planned_workouts`` invocation (EC-03)."""
+    """Result of one ``sync_planned_workouts`` invocation (EC-03/EC-12)."""
 
     workouts_synced: int
     failures: list[dict[str, object]]
+    stale_planned_removed: int = 0
 
 
 def sync_planned_workouts(
@@ -232,8 +233,16 @@ def sync_planned_workouts(
       downgraded back to ``planned`` just because a re-sync of ``/events``
       still (or again) returns that id.
     - A planned event whose id disappears from a later ``/events`` response
-      (removed or completed upstream) is left untouched — this sync only
-      upserts what the fetch returns; it never deletes based on absence.
+      within the synced range (removed, or completed upstream and already
+      flipped by the branch above) is deleted: a still-``status='planned'``
+      row for that range with no matching id in this fetch means intervals.icu
+      no longer has that session scheduled, so the app shouldn't either
+      (EC-12). Only ``source='intervals_planned'`` rows are eligible — a
+      manual (§6 fallback) row is never touched by this sync, and a row
+      already flipped to ``intervals_completed`` is a different source and
+      excluded by construction. Scoped to ``[from_date, to_date]``: this sync
+      only has fresh data for that window, so a planned row outside it is
+      left alone regardless of whether this fetch mentions it.
     """
 
     resolved_now = now or datetime.now(UTC)
@@ -294,15 +303,40 @@ def sync_planned_workouts(
                 }
             )
 
+    synced_external_ids = {event.external_id for event in planned_events}
+    stale_planned = session.scalars(
+        select(PlannedWorkout).where(
+            PlannedWorkout.source == PlannedWorkoutSource.intervals_planned,
+            PlannedWorkout.status == PlannedWorkoutStatus.planned,
+            PlannedWorkout.local_date >= from_date,
+            PlannedWorkout.local_date <= to_date,
+            PlannedWorkout.external_id.notin_(synced_external_ids),
+        )
+    ).all()
+    for row in stale_planned:
+        logger.info(
+            "planned_workout_removed_stale",
+            planned_workout_id=row.id,
+            external_id=row.external_id,
+        )
+        session.delete(row)
+    if stale_planned:
+        session.flush()
+
     logger.info(
         "planned_workouts_sync_completed",
         from_date=from_date.isoformat(),
         to_date=to_date.isoformat(),
         workouts_synced=workouts_synced,
         failure_count=len(failures),
+        stale_planned_removed=len(stale_planned),
     )
 
-    return PlannedWorkoutsSyncResult(workouts_synced=workouts_synced, failures=failures)
+    return PlannedWorkoutsSyncResult(
+        workouts_synced=workouts_synced,
+        failures=failures,
+        stale_planned_removed=len(stale_planned),
+    )
 
 
 def _upsert_completed_activity(
