@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pytest
+from fastmcp.exceptions import ValidationError as McpValidationError
 from sqlalchemy.orm import Session
 
 import app.mcp.tools_write as tools_write_module
@@ -244,6 +245,134 @@ async def test_log_meal_tool_adhoc_item_name_omitted_raises(
     assert result.is_error is False
     payload = result.structured_content["result"]
     assert payload["error"] == "adhoc_item_name_required"
+
+
+@pytest.mark.asyncio
+async def test_log_meal_tool_invalid_meal_type_rejected_with_clean_validation_error(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    """MCP-11: meal_type is now a constrained enum on the tool schema, so an
+    invalid value (wrong casing or a non-member string) is rejected by
+    pydantic/FastMCP *before* it ever reaches domain code — no raw ValueError
+    from `MealType(...)` surfacing as an unhandled 500-equivalent."""
+    _patch_run_with_session(monkeypatch, db_session)
+
+    with pytest.raises(McpValidationError) as exc_info:
+        await mcp.call_tool(
+            "log_meal",
+            {
+                "items": [
+                    {
+                        "quantity": 100,
+                        "quantity_unit": "g",
+                        "name": "Ad-hoc item",
+                        "calories": 100,
+                        "protein_g": 1,
+                        "carbs_g": 1,
+                        "fat_g": 1,
+                    }
+                ],
+                # Wrong casing: MealType members are lowercase only.
+                "meal_type": "Dinner",
+            },
+        )
+
+    assert "meal_type" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_log_template_tool_invalid_meal_type_rejected_with_clean_validation_error(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_template: Callable[..., object],
+) -> None:
+    """MCP-11: same enum constraint applies to log_template's meal_type."""
+    template = make_template()
+    _patch_run_with_session(monkeypatch, db_session)
+
+    with pytest.raises(McpValidationError) as exc_info:
+        await mcp.call_tool(
+            "log_template",
+            {
+                "template_id": template.id,
+                # Not a MealType member at all (reported elsewhere as
+                # accepted in some sessions, which this enum now forecloses).
+                "meal_type": "pre-workout",
+            },
+        )
+
+    assert "meal_type" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_log_meal_tool_omitted_meal_type_reflects_time_based_inference(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    """MCP-11: when meal_type is omitted, the response echoes the *resolved*
+    (inferred) value, not a raw None — 07:00 local falls squarely in the
+    breakfast window (04:00-10:59)."""
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool(
+        "log_meal",
+        {
+            "items": [
+                {
+                    "quantity": 100,
+                    "quantity_unit": "g",
+                    "name": "Ad-hoc item",
+                    "calories": 100,
+                    "protein_g": 1,
+                    "carbs_g": 1,
+                    "fat_g": 1,
+                }
+            ],
+            "local_tz": "Europe/Dublin",
+            "logged_at": "2026-07-26T07:00:00",
+            # meal_type omitted entirely
+        },
+    )
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["meal_type"] == "breakfast"
+
+
+@pytest.mark.asyncio
+async def test_log_meal_tool_explicit_meal_type_is_honored_without_reinference(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    """MCP-11: an explicit meal_type is never overridden by time-based
+    inference, even when logged_at's local time falls in a different
+    window (07:00 would infer to breakfast if meal_type were omitted)."""
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool(
+        "log_meal",
+        {
+            "items": [
+                {
+                    "quantity": 100,
+                    "quantity_unit": "g",
+                    "name": "Ad-hoc item",
+                    "calories": 100,
+                    "protein_g": 1,
+                    "carbs_g": 1,
+                    "fat_g": 1,
+                }
+            ],
+            "local_tz": "Europe/Dublin",
+            "logged_at": "2026-07-26T07:00:00",
+            "meal_type": "dinner",
+        },
+    )
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["meal_type"] == "dinner"
 
 
 @pytest.mark.asyncio

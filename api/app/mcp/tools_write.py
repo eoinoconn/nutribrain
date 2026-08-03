@@ -155,7 +155,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         items: list[MealItemInput],
         local_tz: str | None = None,
         logged_at: datetime | None = None,
-        meal_type: str | None = None,
+        meal_type: MealType | None = None,
         notes: str | None = None,
     ) -> LogMealResult:
         specs = [MealItemSpec(**item.model_dump()) for item in items]
@@ -192,7 +192,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         template_id: int,
         local_tz: str | None = None,
         logged_at: datetime | None = None,
-        meal_type: str | None = None,
+        meal_type: MealType | None = None,
         quantity_scale: NumericDecimal = Decimal("1"),
         notes: str | None = None,
     ) -> LogTemplateResult:

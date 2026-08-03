@@ -34,7 +34,17 @@ def infer_meal_type(logged_at: datetime, local_tz: str) -> MealType:
 
 
 def resolve_meal_type(meal_type: MealType | None, logged_at: datetime, local_tz: str) -> MealType:
-    """Return caller-provided meal_type or infer it from local time."""
+    """Return caller-provided meal_type or infer it from local time.
+
+    When `meal_type` is omitted (None), it is inferred from `logged_at`'s
+    local clock time (see `infer_meal_type` for the exact windows):
+    - breakfast: 04:00-10:59
+    - lunch: 11:00-15:59
+    - dinner: 16:00-21:59
+    - snack: 22:00-03:59 (and any non-matching edge)
+    An explicitly supplied `meal_type` is always honored as-is, with no
+    re-inference.
+    """
 
     if meal_type is not None:
         return meal_type
