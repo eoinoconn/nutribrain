@@ -64,4 +64,26 @@ describe("EnergyChart", () => {
     expect(badge).toHaveTextContent(/could use more fuel/i);
     expect(badge.textContent).not.toMatch(/-?\d+/);
   });
+
+  it("renders a legend distinguishing meal, completed-workout, and planned-workout markers when events are present", () => {
+    const energy = makeEnergy({
+      events: [
+        { at: "2026-08-03T08:00:00Z", deltaKcal: 350, kind: "meal", status: null },
+        { at: "2026-08-03T11:00:00Z", deltaKcal: -320, kind: "workout", status: "completed" },
+        { at: "2026-08-03T20:00:00Z", deltaKcal: -400, kind: "workout", status: "planned" }
+      ]
+    });
+    render(<EnergyChart energy={energy} isLoading={false} />);
+
+    expect(screen.getByText("Meal")).toBeInTheDocument();
+    expect(screen.getByText("Workout (completed)")).toBeInTheDocument();
+    expect(screen.getByText("Workout (planned)")).toBeInTheDocument();
+  });
+
+  it("does not render a marker legend when there are no events", () => {
+    render(<EnergyChart energy={makeEnergy({ events: [] })} isLoading={false} />);
+
+    expect(screen.queryByText("Meal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Workout (completed)")).not.toBeInTheDocument();
+  });
 });

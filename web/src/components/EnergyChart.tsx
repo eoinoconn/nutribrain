@@ -52,6 +52,14 @@ function formatTime(iso: string): string {
   return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+function formatTimeMs(ms: number): string {
+  const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 /** Categorical, non-alarming copy for each fueling status — never a bare signed number. */
 const FUELING_LABELS: Record<FuelingFlag["status"], string> = {
   well_fueled: "Well fueled",
@@ -76,16 +84,18 @@ function FuelingBadge({ flag }: { flag: FuelingFlag }): JSX.Element {
 }
 
 interface ChartRow {
-  at: string;
-  atLabel: string;
+  /** Epoch milliseconds — a numeric x value so the axis spaces points by
+   * actual elapsed time, not evenly-by-index (a category axis on formatted
+   * time labels was the original bug: recharts spaces category ticks by
+   * count, not by the real gaps between timestamps). */
+  at: number;
   actualBalance: number | null;
   forecastBalance: number | null;
 }
 
 function buildChartRows(energy: EnergyTimeline): ChartRow[] {
   const rows: ChartRow[] = energy.points.map((point) => ({
-    at: point.at,
-    atLabel: formatTime(point.at),
+    at: new Date(point.at).getTime(),
     actualBalance: point.balance,
     forecastBalance: null
   }));
@@ -101,8 +111,7 @@ function buildChartRows(energy: EnergyTimeline): ChartRow[] {
       return;
     }
     rows.push({
-      at: point.at,
-      atLabel: formatTime(point.at),
+      at: new Date(point.at).getTime(),
       actualBalance: null,
       forecastBalance: point.balance
     });
@@ -111,33 +120,101 @@ function buildChartRows(energy: EnergyTimeline): ChartRow[] {
   return rows;
 }
 
-function eventColor(event: EnergyEvent): string {
-  return event.kind === "meal" ? EVENT_MEAL_COLOR : EVENT_WORKOUT_COLOR;
+/** The balance the line is actually at when this event fires, so its marker
+ * sits on the line instead of floating at the event's raw delta_kcal (the
+ * previous bug: markers were positioned by step size, not by the balance
+ * they occurred at). compute_energy_timeline emits two points at a step's
+ * timestamp (before/after the jump) — take the later (post-step) one. */
+function balanceAtEvent(event: EnergyEvent, rows: ChartRow[]): number {
+  const atMs = new Date(event.at).getTime();
+  const matches = rows.filter((row) => row.at === atMs);
+  const last = matches[matches.length - 1];
+  if (!last) {
+    return 0;
+  }
+  return last.actualBalance ?? last.forecastBalance ?? 0;
 }
 
-function EnergyEventMarkers({ events }: { events: EnergyEvent[] }): JSX.Element | null {
+/** Meal vs. workout, and completed vs. still-only-planned, are distinguished
+ * by shape and fill (not color alone) — color is never the sole state signal
+ * (web/CLAUDE.md accessibility floor). A planned workout renders hollow to
+ * flag it hasn't happened yet (and could still drop off after its 4-hour
+ * grace period if never confirmed completed). */
+function EventMarkerShape(props: {
+  cx?: number;
+  cy?: number;
+  payload?: { event: EnergyEvent };
+}): JSX.Element {
+  const { cx, cy, payload } = props;
+  if (cx === undefined || cy === undefined || !payload) {
+    return <g />;
+  }
+  const { event } = payload;
+
+  if (event.kind === "meal") {
+    return <circle cx={cx} cy={cy} r={5} fill={EVENT_MEAL_COLOR} stroke="white" strokeWidth={1} />;
+  }
+
+  const isCompleted = event.status === "completed";
+  const size = 6;
+  const points = [
+    [cx, cy - size],
+    [cx + size, cy + size],
+    [cx - size, cy + size]
+  ]
+    .map(([x, y]) => `${x},${y}`)
+    .join(" ");
+  return (
+    <polygon
+      points={points}
+      fill={isCompleted ? EVENT_WORKOUT_COLOR : "white"}
+      stroke={EVENT_WORKOUT_COLOR}
+      strokeWidth={1.5}
+      strokeDasharray={isCompleted ? undefined : "2 2"}
+    />
+  );
+}
+
+function EnergyEventMarkers({
+  events,
+  rows
+}: {
+  events: EnergyEvent[];
+  rows: ChartRow[];
+}): JSX.Element | null {
   if (events.length === 0) {
     return null;
   }
   const data = events.map((event) => ({
-    at: event.at,
-    atLabel: formatTime(event.at),
-    balance: event.deltaKcal,
+    at: new Date(event.at).getTime(),
+    balance: balanceAtEvent(event, rows),
     event
   }));
+  return <Scatter name="Events" data={data} dataKey="balance" shape={EventMarkerShape} />;
+}
+
+function EventLegend(): JSX.Element {
   return (
-    <Scatter
-      name="Events"
-      data={data}
-      dataKey="balance"
-      shape={(props: { cx?: number; cy?: number; payload?: { event: EnergyEvent } }) => {
-        const { cx, cy, payload } = props;
-        if (cx === undefined || cy === undefined || !payload) {
-          return <g />;
-        }
-        return <circle cx={cx} cy={cy} r={5} fill={eventColor(payload.event)} stroke="white" strokeWidth={1} />;
-      }}
-    />
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary dark:text-ink-secondary-dark">
+      <li className="flex items-center gap-1.5">
+        <svg width="12" height="12" aria-hidden="true">
+          <circle cx="6" cy="6" r="5" fill={EVENT_MEAL_COLOR} stroke="white" strokeWidth={1} />
+        </svg>
+        Meal
+      </li>
+      <li className="flex items-center gap-1.5">
+        <svg width="12" height="12" aria-hidden="true">
+          <polygon points="6,1 11,11 1,11" fill={EVENT_WORKOUT_COLOR} />
+        </svg>
+        Workout (completed)
+      </li>
+      <li className="flex items-center gap-1.5">
+        <svg width="12" height="12" aria-hidden="true">
+          <polygon points="6,1 11,11 1,11" fill="white" stroke={EVENT_WORKOUT_COLOR} strokeWidth={1.5} strokeDasharray="2 2" />
+        </svg>
+        Workout (planned)
+      </li>
+    </ul>
   );
 }
 
@@ -190,24 +267,35 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
 
   const rows = buildChartRows(energy);
   const nowAt = energy.points[energy.points.length - 1]?.at ?? energy.forecastPoints[0]?.at ?? null;
+  const nowAtMs = nowAt ? new Date(nowAt).getTime() : null;
+  const rowTimes = rows.map((row) => row.at);
+  const domain: [number, number] | undefined =
+    rowTimes.length > 0 ? [Math.min(...rowTimes), Math.max(...rowTimes)] : undefined;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="h-64 w-full" role="img" aria-label="Line chart of energy balance for the day, actual and forecast">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <XAxis dataKey="atLabel" tick={{ fontSize: 12 }} />
+            <XAxis
+              dataKey="at"
+              type="number"
+              domain={domain ?? ["dataMin", "dataMax"]}
+              tickFormatter={formatTimeMs}
+              tick={{ fontSize: 12 }}
+            />
             <YAxis tick={{ fontSize: 12 }} width={48} />
             <Tooltip
+              labelFormatter={(label: number) => formatTimeMs(label)}
               formatter={(value: number | string | Array<number | string>, name: string | number) =>
                 value === null || value === undefined
                   ? ["—", name]
                   : [formatCalories(Number(value)), name]
               }
             />
-            {nowAt ? (
+            {nowAtMs !== null ? (
               <ReferenceLine
-                x={formatTime(nowAt)}
+                x={nowAtMs}
                 stroke={NOW_LINE_COLOR}
                 strokeDasharray="4 4"
                 label={{
@@ -239,10 +327,11 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
               connectNulls={false}
               isAnimationActive={false}
             />
-            <EnergyEventMarkers events={energy.events} />
+            <EnergyEventMarkers events={energy.events} rows={rows} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      {energy.events.length > 0 ? <EventLegend /> : null}
       <EnergyTextSummary energy={energy} />
     </div>
   );
