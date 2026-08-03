@@ -41,7 +41,8 @@ import type { DayMealGroup, DayResponse, MealItemRequest, MealType } from "../li
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
 import { QuickMacroEntry, type QuickMacroValue } from "../components/QuickMacroEntry";
 import EnergyChart from "../components/EnergyChart";
-import { DayHeader, MEAL_TYPE_LABELS, SummaryRow, formatCalories, formatGrams } from "../components/DaySummary";
+import { DayHeader, SummaryRow } from "../components/DaySummary";
+import { MEAL_TYPE_LABELS, formatCalories, formatGrams } from "../components/daySummaryHelpers";
 import {
   buildCreateMealRequest,
   buildQuickMacroRequest,

@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import EnergyChart, { EnergyChartTooltip, computeHourTicks, computeYTicks } from "./EnergyChart";
+import EnergyChart, { EnergyChartTooltip } from "./EnergyChart";
+import { computeHourTicks, computeYTicks } from "./energyChartTicks";
 import type { EnergyEvent, EnergyTimeline } from "../lib/api/types";
 
 describe("EnergyChartTooltip", () => {
