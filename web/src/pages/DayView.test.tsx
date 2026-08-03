@@ -78,6 +78,7 @@ function makeDay(overrides: Partial<DayResponse> = {}): DayResponse {
     },
     effectiveTarget: null,
     deltaVsTarget: null,
+    energy: null,
     ...overrides
   };
 }

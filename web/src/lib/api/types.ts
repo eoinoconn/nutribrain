@@ -188,12 +188,43 @@ export interface DayMealGroup {
   totals: ItemMacros;
 }
 
+// --- Energy balance (EC-08, api/app/api/day.py EnergyTimelineSchema) -------
+
+export interface EnergyPoint {
+  at: string;
+  balance: number;
+}
+
+export interface EnergyEvent {
+  at: string;
+  deltaKcal: number;
+  kind: "meal" | "workout";
+  status: "planned" | "completed" | null;
+}
+
+export interface FuelingFlag {
+  workoutId: number;
+  at: string;
+  status: "well_fueled" | "under_fueled";
+}
+
+export interface EnergyTimeline {
+  points: EnergyPoint[];
+  forecastPoints: EnergyPoint[];
+  events: EnergyEvent[];
+  currentBalance: number;
+  predictedEndOfDay: number;
+  endOfDayTarget: number;
+  fuelingFlags: FuelingFlag[];
+}
+
 export interface DayResponse {
   date: string;
   meals: Record<string, DayMealGroup[]>;
   dayTotals: ItemMacros;
   effectiveTarget: EffectiveTarget | null;
   deltaVsTarget: ItemMacros | null;
+  energy: EnergyTimeline | null;
 }
 
 export interface PeriodTotals {
