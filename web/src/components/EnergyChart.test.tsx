@@ -116,6 +116,47 @@ describe("EnergyChart", () => {
     }
   });
 
+  it("gives every step's before/after pair a distinct x coordinate on the line", () => {
+    // Regression test: two rows at the exact same timestamp (a step's
+    // before/after balance) made the x axis non-strictly-increasing, which
+    // confused recharts' hover/tooltip point lookup -- hovering near one
+    // step could show a neighboring step's data instead. Every x coordinate
+    // in the rendered line path must be strictly increasing.
+    const energy = makeEnergy({
+      points: [
+        { at: "2026-08-03T01:00:00Z", balance: 0 },
+        { at: "2026-08-03T08:00:00Z", balance: -350 },
+        { at: "2026-08-03T08:00:00Z", balance: -50 },
+        { at: "2026-08-03T11:00:00Z", balance: -260 },
+        { at: "2026-08-03T11:00:00Z", balance: 40 }
+      ],
+      forecastPoints: [{ at: "2026-08-03T11:00:00Z", balance: 40 }],
+      events: [
+        { at: "2026-08-03T08:00:00Z", deltaKcal: 300, kind: "meal", status: null },
+        { at: "2026-08-03T11:00:00Z", deltaKcal: 300, kind: "meal", status: null }
+      ]
+    });
+    const { container } = render(<EnergyChart energy={energy} isLoading={false} isToday={true} />);
+
+    const linePath = container.querySelector("path.recharts-line-curve");
+    const pathD = linePath?.getAttribute("d") ?? "";
+    const numbers = pathD.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+    const xCoords = numbers.filter((_, i) => i % 2 === 0);
+    expect(xCoords.length).toBeGreaterThan(1);
+    for (let i = 1; i < xCoords.length; i++) {
+      expect(xCoords[i]).toBeGreaterThan(xCoords[i - 1]!);
+    }
+  });
+
+  it("renders a zero-calorie reference line", () => {
+    const { container } = render(<EnergyChart energy={makeEnergy()} isLoading={false} isToday={true} />);
+
+    const zeroLine = Array.from(container.querySelectorAll(".recharts-reference-line-line")).find(
+      (el) => el.getAttribute("stroke") === "#d4d4d8"
+    );
+    expect(zeroLine).toBeTruthy();
+  });
+
   it("renders the text-equivalent summary with current balance and predicted end of day", () => {
     render(<EnergyChart energy={makeEnergy()} isLoading={false} isToday={true} />);
 

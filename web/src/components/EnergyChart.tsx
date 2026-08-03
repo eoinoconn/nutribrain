@@ -112,25 +112,54 @@ function FuelingBadge({ flag }: { flag: FuelingFlag }): JSX.Element {
 }
 
 interface ChartRow {
-  /** Epoch milliseconds — a numeric x value so the axis spaces points by
-   * actual elapsed time, not evenly-by-index (a category axis on formatted
-   * time labels was the original bug: recharts spaces category ticks by
-   * count, not by the real gaps between timestamps). */
+  /** Epoch milliseconds, nudged by whole milliseconds to be unique across
+   * the whole row set (see the comment above `dedupeStepTimestamp` below) —
+   * a numeric x value so the axis spaces points by actual elapsed time, not
+   * evenly-by-index (a category axis on formatted time labels was the
+   * original bug: recharts spaces category ticks by count, not by the real
+   * gaps between timestamps). */
   at: number;
+  /** The real, un-nudged timestamp — what a step's own event should match
+   * against and what tick/domain-adjacent rounding should use for display. */
+  originalAt: number;
   actualBalance: number | null;
   forecastBalance: number | null;
 }
 
+/** Every step (a meal or workout) contributes two rows at the *same*
+ * instant — the balance immediately before and immediately after the jump
+ * — to render the vertical part of the step. Recharts' hover/tooltip
+ * lookup assumes strictly-increasing x values on a numeric axis; with
+ * several tied pairs across the dataset, hovering near one step could
+ * resolve to a neighboring step's data instead (observed: the tooltip and
+ * "now"-style crosshair snapping to the wrong point). Nudging each row in a
+ * tied pair by whole milliseconds keeps them visually identical (a
+ * millisecond is imperceptible against an hours-wide axis) while making
+ * every x value on the axis unique. */
+function dedupeStepTimestamp(originalAt: number, lastOriginalAt: number | null, dupCount: number): number {
+  return originalAt === lastOriginalAt ? originalAt + dupCount : originalAt;
+}
+
 function buildChartRows(energy: EnergyTimeline): ChartRow[] {
-  const rows: ChartRow[] = energy.points.map((point) => ({
-    at: new Date(point.at).getTime(),
-    actualBalance: point.balance,
-    forecastBalance: null
-  }));
+  const rows: ChartRow[] = [];
+  let lastOriginalAt: number | null = null;
+  let dupCount = 0;
+
+  function pushRow(originalAt: number, actualBalance: number | null, forecastBalance: number | null): void {
+    dupCount = originalAt === lastOriginalAt ? dupCount + 1 : 0;
+    const at = dedupeStepTimestamp(originalAt, lastOriginalAt, dupCount);
+    lastOriginalAt = originalAt;
+    rows.push({ at, originalAt, actualBalance, forecastBalance });
+  }
+
+  energy.points.forEach((point) => {
+    pushRow(new Date(point.at).getTime(), point.balance, null);
+  });
 
   const lastActual = energy.points[energy.points.length - 1];
 
   energy.forecastPoints.forEach((point, index) => {
+    const originalAt = new Date(point.at).getTime();
     // The first forecast point shares its timestamp with the last actual
     // point (per spec §8, "now" boundary) — bridge the two lines there
     // instead of leaving a gap, rather than pushing a duplicate row.
@@ -138,29 +167,22 @@ function buildChartRows(energy: EnergyTimeline): ChartRow[] {
       rows[rows.length - 1] = { ...rows[rows.length - 1]!, forecastBalance: point.balance };
       return;
     }
-    rows.push({
-      at: new Date(point.at).getTime(),
-      actualBalance: null,
-      forecastBalance: point.balance
-    });
+    pushRow(originalAt, null, point.balance);
   });
 
   return rows;
 }
 
-/** The balance the line is actually at when this event fires, so its marker
- * sits on the line instead of floating at the event's raw delta_kcal (the
- * previous bug: markers were positioned by step size, not by the balance
- * they occurred at). compute_energy_timeline emits two points at a step's
- * timestamp (before/after the jump) — take the later (post-step) one. */
-function balanceAtEvent(event: EnergyEvent, rows: ChartRow[]): number {
+/** The row (and its balance) the line is actually at when this event fires,
+ * so its marker sits on the line instead of floating at the event's raw
+ * delta_kcal (a previous bug: markers were positioned by step size, not by
+ * the balance they occurred at). compute_energy_timeline emits two points
+ * at a step's timestamp (before/after the jump) — take the later
+ * (post-step) one, matching by the row's real (un-nudged) timestamp. */
+function rowAtEvent(event: EnergyEvent, rows: ChartRow[]): ChartRow | undefined {
   const atMs = new Date(event.at).getTime();
-  const matches = rows.filter((row) => row.at === atMs);
-  const last = matches[matches.length - 1];
-  if (!last) {
-    return 0;
-  }
-  return last.actualBalance ?? last.forecastBalance ?? 0;
+  const matches = rows.filter((row) => row.originalAt === atMs);
+  return matches[matches.length - 1];
 }
 
 /** Meal vs. workout, and completed vs. still-only-planned, are distinguished
@@ -219,11 +241,17 @@ interface EventScatterDatum {
  * a plain data-builder function instead of a component for that reason;
  * `<Scatter>` itself must stay inlined directly under `<ComposedChart>`. */
 function buildEventScatterData(events: EnergyEvent[], rows: ChartRow[]): EventScatterDatum[] {
-  return events.map((event) => ({
-    at: new Date(event.at).getTime(),
-    balance: balanceAtEvent(event, rows),
-    event
-  }));
+  return events.map((event) => {
+    const row = rowAtEvent(event, rows);
+    return {
+      // Use the matched row's (possibly deduped) `at` so the marker sits
+      // exactly on that row's line vertex, not the un-deduped original
+      // timestamp, which could now be a fraction of a millisecond off.
+      at: row?.at ?? new Date(event.at).getTime(),
+      balance: row?.actualBalance ?? row?.forecastBalance ?? 0,
+      event
+    };
+  });
 }
 
 function EventLegend(): JSX.Element {
@@ -353,6 +381,7 @@ export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartP
               tick={{ fontSize: 12 }}
             />
             <YAxis domain={yDomain} tick={{ fontSize: 12 }} width={48} />
+            <ReferenceLine y={0} stroke="#d4d4d8" />
             <Tooltip
               labelFormatter={(label: number) => formatTimeMs(label)}
               formatter={(value: number | string | Array<number | string>, name: string | number) =>
