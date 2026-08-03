@@ -243,6 +243,8 @@ Slot `EnergyChart` between `SummaryRow` and the action buttons, gated on `isToda
 Not a code task — no branch/PR. Once EC-03 lands the hardcoded `1.1` constant, open a GitHub issue documenting: the constant's current value and where it lives (`api/app/domain/energy_balance.py`), how it was derived (three of this athlete's own completed rides, checked against the literature's ~1.0–1.05 range), and the proposed future shape (a `kcal_per_kilojoule` field on the `app_settings` table from EC-06, editable from `SettingsPage.tsx` alongside the timezone override). Link it from this spec doc once filed.
 **Done when:** the issue exists and is linked here.
 
+**Filed:** https://github.com/eoinoconn/nutribrain/issues/77
+
 ---
 
 ## Parallelization map
