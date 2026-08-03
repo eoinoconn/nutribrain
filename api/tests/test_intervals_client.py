@@ -56,6 +56,9 @@ def test_fetch_activities_detailed_returns_per_activity_records() -> None:
             duration_minutes=60.0,
             sport_type="Run",
             calories=500,
+            # Int in the raw payload (per the OpenAPI spec), stringified to
+            # match how a planned event's own id is stored as external_id.
+            paired_event_id="124265901",
         ),
         ActivityDetail(
             external_id="i2",

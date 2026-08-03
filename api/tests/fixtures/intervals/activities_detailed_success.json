@@ -5,7 +5,8 @@
     "moving_time": 3600,
     "elapsed_time": 3700,
     "type": "Run",
-    "calories": 500
+    "calories": 500,
+    "paired_event_id": 124265901
   },
   {
     "id": "i2",

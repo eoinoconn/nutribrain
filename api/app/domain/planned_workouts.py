@@ -205,33 +205,41 @@ def sync_planned_workouts(
     and re-raises, matching the "nothing to write if the fetch itself
     failed" rule the calories-out sync already follows.
 
-    Planned -> completed correlation (the trickiest judgment call in EC-03):
-    the ``planned_workouts.external_id`` column comment says "unique per
-    source", which only makes sense as a deliberate design signal if the
-    *same* external id can legitimately appear under both
-    ``intervals_planned`` and ``intervals_completed`` for what is actually
-    one underlying workout (a planned event that later got a completed
-    activity) — intervals.icu's events and activities endpoints are
-    otherwise different id namespaces with no shared correlation field
-    exposed by ``ActivityDetail``/``PlannedEventDetail``, so this is the only
-    correlation signal available. Given that, this function resolves the
-    "Done when" flip requirement as follows:
+    Planned -> completed correlation: EC-03 originally guessed that a
+    completed activity's own id could reappear as a planned event's id
+    across the two endpoints — confirmed wrong in practice (intervals.icu
+    gave a real calendar entry and its resulting activity two unrelated ids,
+    leaving both a stale "planned" row and a separate "completed" row
+    visible at once). The vendored OpenAPI spec (``openapi-spec (3).json``,
+    ``Activity.paired_event_id``) documents the actual link: a completed
+    activity carries the *event's own* ``id`` (not the event's
+    ``external_id`` field — intervals.icu's ``Event.id``, which is what this
+    codebase already stores as a planned row's ``external_id``) in
+    ``paired_event_id``. This function resolves the "Done when" flip
+    requirement as follows:
 
-    - When a completed activity's ``external_id`` matches an existing
-      ``(intervals_planned, external_id)`` row, that row is updated in place:
-      its ``source`` flips to ``intervals_completed``, ``status`` to
-      ``completed``, ``actual_calories`` is set, and ``icu_joules``/
+    - When a completed activity's ``paired_event_id`` matches an existing
+      ``(intervals_planned, external_id)`` row, that row is updated in
+      place: its ``source`` flips to ``intervals_completed``, ``status`` to
+      ``completed``, ``actual_calories`` is set, ``icu_joules``/
       ``estimated_calories`` are cleared (per the mapping table: completed
       rows always carry null ``icu_joules``/``estimated_calories``, since
-      that endpoint never returns ``icu_joules``). This is an UPDATE that
-      changes the unique key's ``source`` value, not a same-source upsert —
-      deliberately, so no stale planned duplicate is left behind next to a
-      new completed row for the same real-world workout.
-    - When a planned event's ``external_id`` matches an existing
-      ``(intervals_completed, external_id)`` row, the planned-side upsert is
-      skipped entirely — an already-completed row is never retroactively
-      downgraded back to ``planned`` just because a re-sync of ``/events``
-      still (or again) returns that id.
+      that endpoint never returns ``icu_joules``), ``external_id`` is
+      rewritten to the *activity's own* id (so the row is identifiable via
+      its real intervals.icu activity going forward — e.g. a
+      ``/activities/{external_id}`` link — and so a later re-sync of this
+      same activity finds it again via the ordinary same-source lookup), and
+      ``paired_event_id`` is kept, preserving the link back to the original
+      event so a later ``/events`` sync can still recognize it as completed
+      (see the next bullet). This is an UPDATE that changes the unique key's
+      ``source`` value, not a same-source upsert — deliberately, so no stale
+      planned duplicate is left behind next to a new completed row for the
+      same real-world workout.
+    - When a planned event's own id matches an existing
+      ``(intervals_completed, paired_event_id)`` row, the planned-side
+      upsert is skipped entirely — an already-completed row is never
+      retroactively downgraded back to ``planned`` just because a re-sync of
+      ``/events`` still (or again) returns that event.
     - A planned event whose id disappears from a later ``/events`` response
       within the synced range (removed, or completed upstream and already
       flipped by the branch above) is deleted: a still-``status='planned'``
@@ -361,24 +369,60 @@ def _upsert_completed_activity(
         else _FALLBACK_DURATION_MINUTES
     )
 
-    row = session.scalar(
+    planned_match = None
+    if activity.paired_event_id is not None:
+        planned_match = session.scalar(
+            select(PlannedWorkout).where(
+                PlannedWorkout.source == PlannedWorkoutSource.intervals_planned,
+                PlannedWorkout.external_id == activity.paired_event_id,
+            )
+        )
+    # Idempotent re-sync of this same completed activity (not a
+    # planned->completed flip -- the row is already `intervals_completed`).
+    completed_match = session.scalar(
         select(PlannedWorkout).where(
-            PlannedWorkout.source == PlannedWorkoutSource.intervals_planned,
+            PlannedWorkout.source == PlannedWorkoutSource.intervals_completed,
             PlannedWorkout.external_id == activity.external_id,
         )
     )
-    if row is None:
-        row = session.scalar(
-            select(PlannedWorkout).where(
-                PlannedWorkout.source == PlannedWorkoutSource.intervals_completed,
-                PlannedWorkout.external_id == activity.external_id,
-            )
+
+    if planned_match is not None and completed_match is not None:
+        # Both exist for the same real workout -- e.g. left over from before
+        # paired_event_id-based correlation existed (this activity was
+        # synced once already under the old same-external_id guess, which
+        # never matched, so it got its own row; the original planned row
+        # from /events was never flipped and is only now findable via
+        # paired_event_id). Repurposing `planned_match` into a completed row
+        # here would collide with `completed_match`'s existing
+        # (source, external_id) key, so consolidate onto the already-
+        # completed row instead and drop the now-redundant planned one.
+        logger.info(
+            "planned_workout_consolidated_duplicate",
+            kept_id=completed_match.id,
+            removed_id=planned_match.id,
         )
+        session.delete(planned_match)
+        session.flush()
+        row: PlannedWorkout | None = completed_match
+    else:
+        row = planned_match or completed_match
+
     if row is None:
         row = PlannedWorkout(external_id=activity.external_id)
         session.add(row)
 
     row.source = PlannedWorkoutSource.intervals_completed
+    # When this row was found via paired_event_id, it still carries the
+    # planned event's own id (from before the flip) -- rewrite it to the
+    # activity's own external_id so a later re-sync of the same activity
+    # finds this row via the idempotent-resync lookup above (which matches
+    # on the activity's external_id, not the original event's) instead of
+    # creating a duplicate.
+    row.external_id = activity.external_id
+    # Preserved separately from external_id (which just got overwritten
+    # above) so `_upsert_planned_event` can still recognize "this event has
+    # already been completed" on a later /events sync.
+    row.paired_event_id = activity.paired_event_id
     row.local_date = local_date
     row.start_at = start_at
     row.duration_minutes = duration_minutes
@@ -404,13 +448,16 @@ def _upsert_planned_event(
     """Upsert one planned-event row, skipping ids already flipped to completed.
 
     See ``sync_planned_workouts``'s docstring for the planned -> completed
-    correlation rationale.
+    correlation rationale. Matches on ``paired_event_id`` (not
+    ``external_id``): a completed row's ``external_id`` is rewritten to the
+    activity's own id when it's flipped (``_upsert_completed_activity``),
+    so the *original* event's id only survives on ``paired_event_id``.
     """
 
     already_completed = session.scalar(
         select(PlannedWorkout.id).where(
             PlannedWorkout.source == PlannedWorkoutSource.intervals_completed,
-            PlannedWorkout.external_id == event.external_id,
+            PlannedWorkout.paired_event_id == event.external_id,
         )
     )
     if already_completed is not None:

@@ -194,8 +194,12 @@ class TestPlannedToCompletedFlip:
     """The trickiest judgment call: does a planned row flip in place?"""
 
     def test_previously_planned_row_flips_to_completed(self, db_session: Session) -> None:
+        # Real intervals.icu behavior (confirmed via the vendored OpenAPI
+        # spec, not a shared id): an event and its resulting activity have
+        # *different* ids. The activity carries the event's id separately,
+        # in paired_event_id.
         event = PlannedEventDetail(
-            external_id="shared-1",
+            external_id="event-1",
             start_date_local="2031-08-04T06:00:00",
             duration_minutes=90.0,
             sport_type="Ride",
@@ -210,17 +214,18 @@ class TestPlannedToCompletedFlip:
             fetch_planned=lambda *, oldest, newest: [event],
         )
         planned_row = _row(
-            db_session, source=PlannedWorkoutSource.intervals_planned, external_id="shared-1"
+            db_session, source=PlannedWorkoutSource.intervals_planned, external_id="event-1"
         )
         assert planned_row is not None
         planned_id = planned_row.id
 
         activity = ActivityDetail(
-            external_id="shared-1",
+            external_id="activity-1",
             start_date_local="2031-08-04T06:05:00",
             duration_minutes=88.0,
             sport_type="Ride",
             calories=980,
+            paired_event_id="event-1",
         )
         sync_planned_workouts(
             db_session,
@@ -232,31 +237,77 @@ class TestPlannedToCompletedFlip:
         )
 
         # No stale planned duplicate left behind -- exactly one row for this
-        # external_id, now flipped in place to the completed source/status.
+        # workout, now flipped in place to the completed source/status,
+        # identified by the activity's own id (not the original event's).
         assert len(_all_rows(db_session)) == 1
         completed_row = _row(
-            db_session, source=PlannedWorkoutSource.intervals_completed, external_id="shared-1"
+            db_session, source=PlannedWorkoutSource.intervals_completed, external_id="activity-1"
         )
         assert completed_row is not None
         assert completed_row.id == planned_id
+        assert completed_row.paired_event_id == "event-1"
         assert completed_row.status == PlannedWorkoutStatus.completed
         assert completed_row.actual_calories == 980
         assert completed_row.icu_joules is None
         assert completed_row.estimated_calories is None
         assert (
-            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="shared-1")
+            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="event-1")
             is None
         )
 
-    def test_stale_planned_resync_does_not_downgrade_a_completed_row(
+    def test_consolidates_a_pre_existing_duplicate_pair_onto_the_completed_row(
         self, db_session: Session
     ) -> None:
+        """A real scenario hit while shipping this fix: an activity had
+        already been synced once under the old (incorrect) same-external_id
+        guess, before paired_event_id-based correlation existed -- so it got
+        its own row with no flip, leaving the original planned row
+        stranded. The next sync now correctly finds the planned row via
+        paired_event_id, but naively flipping it would collide with the
+        already-existing completed row's (source, external_id) key. Both
+        must consolidate onto one row instead of erroring.
+        """
+
+        planned_leftover = PlannedWorkout(
+            external_id="event-4",
+            source=PlannedWorkoutSource.intervals_planned,
+            local_date=date(2031, 8, 4),
+            start_at=datetime(2031, 8, 4, 6, 0, tzinfo=UTC),
+            duration_minutes=54,
+            sport_type="Swim",
+            icu_joules=None,
+            estimated_calories=None,
+            actual_calories=None,
+            status=PlannedWorkoutStatus.planned,
+            fetched_at=_NOW,
+        )
+        completed_leftover = PlannedWorkout(
+            external_id="activity-4",
+            source=PlannedWorkoutSource.intervals_completed,
+            local_date=date(2031, 8, 4),
+            start_at=datetime(2031, 8, 4, 6, 5, tzinfo=UTC),
+            duration_minutes=40,
+            sport_type="Swim",
+            icu_joules=None,
+            estimated_calories=None,
+            actual_calories=466,
+            status=PlannedWorkoutStatus.completed,
+            fetched_at=_NOW,
+            # No paired_event_id yet -- this row predates the fix, exactly
+            # like the real leftover row this test models.
+            paired_event_id=None,
+        )
+        db_session.add_all([planned_leftover, completed_leftover])
+        db_session.flush()
+        completed_id = completed_leftover.id
+
         activity = ActivityDetail(
-            external_id="shared-2",
-            start_date_local="2031-08-04T06:00:00",
-            duration_minutes=60.0,
-            sport_type="Run",
-            calories=500,
+            external_id="activity-4",
+            start_date_local="2031-08-04T06:05:00",
+            duration_minutes=40.0,
+            sport_type="Swim",
+            calories=466,
+            paired_event_id="event-4",
         )
         sync_planned_workouts(
             db_session,
@@ -267,10 +318,92 @@ class TestPlannedToCompletedFlip:
             fetch_planned=lambda *, oldest, newest: [],
         )
 
-        # Upstream /events still (or again) returns the same id -- e.g. a
+        assert len(_all_rows(db_session)) == 1
+        row = _row(
+            db_session, source=PlannedWorkoutSource.intervals_completed, external_id="activity-4"
+        )
+        assert row is not None
+        assert row.id == completed_id
+        assert row.paired_event_id == "event-4"
+        assert (
+            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="event-4")
+            is None
+        )
+
+    def test_activity_and_its_still_cached_event_in_the_same_sync_produce_one_row(
+        self, db_session: Session
+    ) -> None:
+        """The reported real-world bug: a single sync call whose /activities
+        response already includes the completed workout while /events still
+        (also) returns its original calendar entry -- intervals.icu doesn't
+        drop a completed event from /events immediately. Activities are
+        processed first (see sync_planned_workouts), so the activity creates
+        a fresh completed row (nothing planned exists yet to flip) carrying
+        paired_event_id; the event processed afterward must then recognize
+        that id via paired_event_id and skip, rather than creating a second,
+        stuck-forever "planned" row for the same real workout.
+        """
+
+        activity = ActivityDetail(
+            external_id="activity-3",
+            start_date_local="2031-08-04T06:00:00",
+            duration_minutes=40.0,
+            sport_type="Swim",
+            calories=466,
+            paired_event_id="event-3",
+        )
+        event = PlannedEventDetail(
+            external_id="event-3",
+            start_date_local="2031-08-04T00:00:00",
+            duration_minutes=54.0,
+            sport_type="Swim",
+            icu_joules=None,
+        )
+
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [activity],
+            fetch_planned=lambda *, oldest, newest: [event],
+        )
+
+        assert len(_all_rows(db_session)) == 1
+        completed_row = _row(
+            db_session, source=PlannedWorkoutSource.intervals_completed, external_id="activity-3"
+        )
+        assert completed_row is not None
+        assert completed_row.paired_event_id == "event-3"
+        assert (
+            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="event-3")
+            is None
+        )
+
+    def test_stale_planned_resync_does_not_downgrade_a_completed_row(
+        self, db_session: Session
+    ) -> None:
+        activity = ActivityDetail(
+            external_id="activity-2",
+            start_date_local="2031-08-04T06:00:00",
+            duration_minutes=60.0,
+            sport_type="Run",
+            calories=500,
+            paired_event_id="event-2",
+        )
+        sync_planned_workouts(
+            db_session,
+            from_date=_FROM,
+            to_date=_TO,
+            now=_NOW,
+            fetch_activities=lambda *, oldest, newest: [activity],
+            fetch_planned=lambda *, oldest, newest: [],
+        )
+
+        # Upstream /events still (or again) returns the same event -- e.g. a
         # stale calendar entry that hasn't dropped off yet.
         event = PlannedEventDetail(
-            external_id="shared-2",
+            external_id="event-2",
             start_date_local="2031-08-04T06:00:00",
             duration_minutes=60.0,
             sport_type="Run",
@@ -287,13 +420,13 @@ class TestPlannedToCompletedFlip:
 
         assert len(_all_rows(db_session)) == 1
         completed_row = _row(
-            db_session, source=PlannedWorkoutSource.intervals_completed, external_id="shared-2"
+            db_session, source=PlannedWorkoutSource.intervals_completed, external_id="activity-2"
         )
         assert completed_row is not None
         assert completed_row.status == PlannedWorkoutStatus.completed
         assert completed_row.actual_calories == 500
         assert (
-            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="shared-2")
+            _row(db_session, source=PlannedWorkoutSource.intervals_planned, external_id="event-2")
             is None
         )
 

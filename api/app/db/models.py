@@ -303,6 +303,15 @@ class PlannedWorkout(Base):
     source: Mapped[PlannedWorkoutSource] = mapped_column(
         _pg_enum(PlannedWorkoutSource, "planned_workout_source")
     )
+    # intervals.icu's own link from a completed activity back to the
+    # calendar event it fulfilled (Activity.paired_event_id in the vendored
+    # OpenAPI spec, an int matching that event's own id -- a different id
+    # space from the activity's own external_id). Set only when a completed
+    # row was flipped from a matching planned row; used to recognize "this
+    # event has already been completed" on a later /events sync without
+    # relying on external_id, which gets rewritten to the activity's own id
+    # on flip (see app/domain/planned_workouts.py's _upsert_completed_activity).
+    paired_event_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     local_date: Mapped[date] = mapped_column(Date)
     # Null start times are not usable for this feature; reject/skip at sync time.
     start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

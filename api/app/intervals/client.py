@@ -32,6 +32,14 @@ class ActivityDetail:
     """One completed intervals.icu activity, unsummed.
 
     Feeds ``planned_workouts`` rows with ``status='completed'`` (EC-03).
+
+    ``paired_event_id`` is intervals.icu's own link from a completed
+    activity back to the calendar event it fulfilled (the API's
+    ``Activity.paired_event_id``, an int matching that event's own ``id`` --
+    confirmed against the vendored OpenAPI spec, not the activity's own
+    ``id``/``external_id``, which is a separate string in a different id
+    space and was EC-03's original, incorrect correlation guess). ``None``
+    when the activity wasn't created from a scheduled event.
     """
 
     external_id: str
@@ -39,6 +47,7 @@ class ActivityDetail:
     duration_minutes: float | None
     sport_type: str | None
     calories: int | None
+    paired_event_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -209,6 +218,7 @@ def _parse_activities_detailed_payload(payload: Any) -> list[ActivityDetail]:
         duration_minutes = _extract_duration_minutes(activity)
         sport_type = _extract_sport_type(activity)
         calories = _extract_activity_calories(activity)
+        paired_event_id = _extract_paired_event_id(activity)
 
         details.append(
             ActivityDetail(
@@ -217,6 +227,7 @@ def _parse_activities_detailed_payload(payload: Any) -> list[ActivityDetail]:
                 duration_minutes=duration_minutes,
                 sport_type=sport_type,
                 calories=calories,
+                paired_event_id=paired_event_id,
             )
         )
 
@@ -285,6 +296,21 @@ def _extract_sport_type(row: dict[str, Any]) -> str | None:
     if not isinstance(sport_type, str):
         raise ValueError("sport type must be a string")
     return sport_type
+
+
+def _extract_paired_event_id(row: dict[str, Any]) -> str | None:
+    """Extract and stringify an activity's ``paired_event_id`` (int, per the
+    OpenAPI spec) to match the string form ``_extract_external_id`` stores
+    for a planned event's own ``id`` -- the two need to compare equal as
+    strings for the sync's planned/completed correlation to find a match.
+    """
+
+    paired = _first_present(row, "paired_event_id")
+    if paired is None:
+        return None
+    if isinstance(paired, bool):
+        raise TypeError("paired_event_id must not be boolean")
+    return str(paired)
 
 
 def _extract_icu_joules(row: dict[str, Any]) -> float | None:
