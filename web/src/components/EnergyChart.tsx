@@ -175,22 +175,27 @@ function EventMarkerShape(props: {
   );
 }
 
-function EnergyEventMarkers({
-  events,
-  rows
-}: {
-  events: EnergyEvent[];
-  rows: ChartRow[];
-}): JSX.Element | null {
-  if (events.length === 0) {
-    return null;
-  }
-  const data = events.map((event) => ({
+interface EventScatterDatum {
+  at: number;
+  balance: number;
+  event: EnergyEvent;
+}
+
+/** Recharts' `ComposedChart` inspects its own `props.children` by element
+ * type (Line/Scatter/etc.) to build the chart's layers — it does this
+ * statically, before rendering, so it only recognizes chart primitives that
+ * are *direct* JSX children. A `<Scatter>` wrapped inside a custom
+ * component (as this used to be) is invisible to that scan: the component
+ * type in the children array is the wrapper, not `Scatter`, so recharts
+ * silently drops the whole layer — no error, just nothing rendered. Kept as
+ * a plain data-builder function instead of a component for that reason;
+ * `<Scatter>` itself must stay inlined directly under `<ComposedChart>`. */
+function buildEventScatterData(events: EnergyEvent[], rows: ChartRow[]): EventScatterDatum[] {
+  return events.map((event) => ({
     at: new Date(event.at).getTime(),
     balance: balanceAtEvent(event, rows),
     event
   }));
-  return <Scatter name="Events" data={data} dataKey="balance" shape={EventMarkerShape} />;
 }
 
 function EventLegend(): JSX.Element {
@@ -271,6 +276,7 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
   const rowTimes = rows.map((row) => row.at);
   const domain: [number, number] | undefined =
     rowTimes.length > 0 ? [Math.min(...rowTimes), Math.max(...rowTimes)] : undefined;
+  const eventData = buildEventScatterData(energy.events, rows);
 
   return (
     <div className="space-y-3">
@@ -327,7 +333,9 @@ export default function EnergyChart({ energy, isLoading }: EnergyChartProps): JS
               connectNulls={false}
               isAnimationActive={false}
             />
-            <EnergyEventMarkers events={energy.events} rows={rows} />
+            {eventData.length > 0 ? (
+              <Scatter name="Events" data={eventData} dataKey="balance" shape={EventMarkerShape} />
+            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -1,7 +1,30 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import EnergyChart from "./EnergyChart";
 import type { EnergyTimeline } from "../lib/api/types";
+
+// recharts' ResponsiveContainer measures via getBoundingClientRect; jsdom
+// returns an all-zero rect by default, which makes it skip rendering the
+// chart body entirely (so a test that only queries text content can pass
+// even if a chart layer is silently dropped, as recharts does for a chart
+// primitive wrapped in a non-chart component instead of a direct child —
+// exactly the bug this file's marker tests below are guarding against).
+beforeEach(() => {
+  Element.prototype.getBoundingClientRect = () =>
+    ({
+      width: 600,
+      height: 300,
+      top: 0,
+      left: 0,
+      bottom: 300,
+      right: 600,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return {};
+      }
+    });
+});
 
 function makeEnergy(overrides: Partial<EnergyTimeline> = {}): EnergyTimeline {
   return {
@@ -33,6 +56,27 @@ describe("EnergyChart", () => {
     render(<EnergyChart energy={null} isLoading={false} />);
 
     expect(screen.getByText(/no target set for this day/i)).toBeInTheDocument();
+  });
+
+  it("renders one visible marker per event on the chart itself, not just in the legend", () => {
+    // Regression test: `<Scatter>` was previously wrapped in a custom
+    // component, which recharts silently fails to recognize as a chart
+    // child (it inspects direct JSX children by type before rendering), so
+    // no markers appeared on the chart at all despite the legend/summary
+    // text below it looking correct. Assert against the actual rendered
+    // marker shapes, not just presentational text.
+    const energy = makeEnergy({
+      events: [
+        { at: "2026-08-03T08:00:00Z", deltaKcal: 350, kind: "meal", status: null },
+        { at: "2026-08-03T11:00:00Z", deltaKcal: -320, kind: "workout", status: "completed" },
+        { at: "2026-08-03T20:00:00Z", deltaKcal: -400, kind: "workout", status: "planned" }
+      ]
+    });
+    const { container } = render(<EnergyChart energy={energy} isLoading={false} />);
+
+    const scatterLayer = container.querySelector(".recharts-scatter");
+    expect(scatterLayer).not.toBeNull();
+    expect(scatterLayer?.querySelectorAll(".recharts-scatter-symbol")).toHaveLength(3);
   });
 
   it("renders the text-equivalent summary with current balance and predicted end of day", () => {
