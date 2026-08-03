@@ -153,3 +153,34 @@ async def test_merge_food_tool_self_merge_error(
     assert result.is_error is False
     payload = result.structured_content["result"]
     assert payload["error"] == "food_merge_same_food"
+
+
+@pytest.mark.asyncio
+async def test_add_food_tool_accepts_numeric_strings_for_decimal_fields(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    """The advertised schema for Decimal fields is now a plain `number`
+    (see NumericDecimal in tools_write.py), but the underlying Decimal
+    validator is untouched, so numeric strings — the precision-preserving
+    form some callers use to avoid float round-tripping — must still be
+    accepted at runtime even though the schema no longer advertises them."""
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool(
+        "add_food",
+        {
+            "name": "String Decimal Oats",
+            "serving_size": "100",
+            "serving_unit": "g",
+            "calories": "389.5",
+            "protein_g": "16.7",
+            "carbs_g": "66.3",
+            "fat_g": "6.9",
+        },
+    )
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["calories"] == "389.5"
+    assert payload["protein_g"] == "16.7"

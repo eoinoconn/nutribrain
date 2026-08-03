@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from typing import cast
+from typing import Annotated, cast
 
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, WithJsonSchema
 
 from app.api.foods import FoodResponse
 from app.db import MealType, QuantityUnit, ServingUnit
@@ -56,33 +56,43 @@ from app.mcp.serializers import (
     serialize_template,
 )
 
+# Pydantic's default JSON Schema for Decimal is `anyOf: [{type: number}, {type:
+# string, pattern: ...}]` (~60-70 tokens per field), because Decimal accepts
+# both numeric and string input at the *runtime* validation layer. That
+# runtime acceptance (numeric strings, ints, floats, Decimals) is unchanged
+# here and still fully supported for precision-sensitive callers — this alias
+# only overrides what's *advertised* in the tool schema, collapsing it to a
+# plain `{"type": "number"}` (~10 tokens) since MCP transport is JSON and
+# schema consumers only need to know "send a number".
+NumericDecimal = Annotated[Decimal, WithJsonSchema({"type": "number"})]
+
 
 class MealItemInput(BaseModel):
     name: str = Field(min_length=1)
-    quantity: Decimal
+    quantity: NumericDecimal
     quantity_unit: QuantityUnit
     food_id: int | None = None
-    calories: Decimal | None = None
-    protein_g: Decimal | None = None
-    carbs_g: Decimal | None = None
-    fat_g: Decimal | None = None
-    fiber_g: Decimal | None = None
-    sat_fat_g: Decimal | None = None
-    sodium_mg: Decimal | None = None
+    calories: NumericDecimal | None = None
+    protein_g: NumericDecimal | None = None
+    carbs_g: NumericDecimal | None = None
+    fat_g: NumericDecimal | None = None
+    fiber_g: NumericDecimal | None = None
+    sat_fat_g: NumericDecimal | None = None
+    sodium_mg: NumericDecimal | None = None
 
 
 class TemplateItemInput(BaseModel):
     name: str = Field(min_length=1)
-    quantity: Decimal
+    quantity: NumericDecimal
     quantity_unit: QuantityUnit
     food_id: int | None = None
-    calories: Decimal | None = None
-    protein_g: Decimal | None = None
-    carbs_g: Decimal | None = None
-    fat_g: Decimal | None = None
-    fiber_g: Decimal | None = None
-    sat_fat_g: Decimal | None = None
-    sodium_mg: Decimal | None = None
+    calories: NumericDecimal | None = None
+    protein_g: NumericDecimal | None = None
+    carbs_g: NumericDecimal | None = None
+    fat_g: NumericDecimal | None = None
+    fiber_g: NumericDecimal | None = None
+    sat_fat_g: NumericDecimal | None = None
+    sodium_mg: NumericDecimal | None = None
 
 
 type LogMealResult = MealModel | ToolErrorResponse
@@ -175,7 +185,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         local_tz: str | None = None,
         logged_at: datetime | None = None,
         meal_type: str | None = None,
-        quantity_scale: Decimal = Decimal("1"),
+        quantity_scale: NumericDecimal = Decimal("1"),
         notes: str | None = None,
     ) -> LogTemplateResult:
         try:
@@ -214,7 +224,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         local_tz: str,
         to_day: str | date | None = None,
         at: time | None = None,
-        quantity_scale: Decimal | None = None,
+        quantity_scale: NumericDecimal | None = None,
         notes: str | None = None,
     ) -> CopyMealResult:
         try:
@@ -244,16 +254,16 @@ def register_write_tools(mcp: FastMCP) -> None:
     )
     def add_food_tool(
         name: str,
-        serving_size: Decimal,
+        serving_size: NumericDecimal,
         serving_unit: ServingUnit,
-        calories: Decimal,
-        protein_g: Decimal,
-        carbs_g: Decimal,
-        fat_g: Decimal,
-        fiber_g: Decimal | None = None,
-        sat_fat_g: Decimal | None = None,
-        sodium_mg: Decimal | None = None,
-        density_g_per_ml: Decimal | None = None,
+        calories: NumericDecimal,
+        protein_g: NumericDecimal,
+        carbs_g: NumericDecimal,
+        fat_g: NumericDecimal,
+        fiber_g: NumericDecimal | None = None,
+        sat_fat_g: NumericDecimal | None = None,
+        sodium_mg: NumericDecimal | None = None,
+        density_g_per_ml: NumericDecimal | None = None,
         force: bool = False,
     ) -> AddFoodResult:
         try:
@@ -289,16 +299,16 @@ def register_write_tools(mcp: FastMCP) -> None:
     def update_food_tool(
         food_id: int,
         name: str | None = None,
-        serving_size: Decimal | None = None,
+        serving_size: NumericDecimal | None = None,
         serving_unit: ServingUnit | None = None,
-        calories: Decimal | None = None,
-        protein_g: Decimal | None = None,
-        carbs_g: Decimal | None = None,
-        fat_g: Decimal | None = None,
-        fiber_g: Decimal | None = None,
-        sat_fat_g: Decimal | None = None,
-        sodium_mg: Decimal | None = None,
-        density_g_per_ml: Decimal | None = None,
+        calories: NumericDecimal | None = None,
+        protein_g: NumericDecimal | None = None,
+        carbs_g: NumericDecimal | None = None,
+        fat_g: NumericDecimal | None = None,
+        fiber_g: NumericDecimal | None = None,
+        sat_fat_g: NumericDecimal | None = None,
+        sodium_mg: NumericDecimal | None = None,
+        density_g_per_ml: NumericDecimal | None = None,
     ) -> UpdateFoodResult:
         try:
             result = cast(
@@ -534,16 +544,16 @@ def register_write_tools(mcp: FastMCP) -> None:
     )
     def update_meal_item_tool(
         item_id: int,
-        quantity: Decimal | None = None,
+        quantity: NumericDecimal | None = None,
         quantity_unit: QuantityUnit | None = None,
         food_id: int | None = _FOOD_ID_UNSET,  # type: ignore[assignment]
-        calories: Decimal | None = None,
-        protein_g: Decimal | None = None,
-        carbs_g: Decimal | None = None,
-        fat_g: Decimal | None = None,
-        fiber_g: Decimal | None = None,
-        sat_fat_g: Decimal | None = None,
-        sodium_mg: Decimal | None = None,
+        calories: NumericDecimal | None = None,
+        protein_g: NumericDecimal | None = None,
+        carbs_g: NumericDecimal | None = None,
+        fat_g: NumericDecimal | None = None,
+        fiber_g: NumericDecimal | None = None,
+        sat_fat_g: NumericDecimal | None = None,
+        sodium_mg: NumericDecimal | None = None,
     ) -> UpdateMealItemResult:
         domain_kwargs: dict[str, object] = {
             "item_id": item_id,
