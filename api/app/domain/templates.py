@@ -31,7 +31,7 @@ from app.domain.dto import (
     TemplateItemSpec,
     TemplateResponse,
 )
-from app.domain.errors import TemplateNotFoundError
+from app.domain.errors import AdhocItemNameRequiredError, FoodNotFoundError, TemplateNotFoundError
 from app.domain.meal_timing import localize_naive_datetime, resolve_meal_type
 from app.domain.nutrition_math import compute_item_macros
 
@@ -53,7 +53,7 @@ def create_template(
     session.flush()
 
     for spec in items:
-        ti = _spec_to_template_item(spec, template.id)
+        ti = _spec_to_template_item(session, spec, template.id)
         session.add(ti)
 
     session.flush()
@@ -86,7 +86,7 @@ def update_template(
         session.flush()
 
         for spec in items:
-            ti = _spec_to_template_item(spec, template.id)
+            ti = _spec_to_template_item(session, spec, template.id)
             session.add(ti)
 
     session.flush()
@@ -287,21 +287,25 @@ def _get_template_or_raise(session: Session, template_id: int) -> Template:
     return template
 
 
-def _spec_to_template_item(spec: TemplateItemSpec, template_id: int) -> TemplateItem:
+def _spec_to_template_item(
+    session: Session, spec: TemplateItemSpec, template_id: int
+) -> TemplateItem:
     """Convert a TemplateItemSpec to a TemplateItem ORM object."""
+
+    name = _resolve_item_name(session, food_id=spec.food_id, name=spec.name)
 
     if spec.food_id is not None:
         return TemplateItem(
             template_id=template_id,
             food_id=spec.food_id,
-            name=spec.name,
+            name=name,
             quantity=spec.quantity,
             quantity_unit=spec.quantity_unit,
         )
     return TemplateItem(
         template_id=template_id,
         food_id=None,
-        name=spec.name,
+        name=name,
         quantity=spec.quantity,
         quantity_unit=spec.quantity_unit,
         calories=spec.calories,
@@ -312,6 +316,29 @@ def _spec_to_template_item(spec: TemplateItemSpec, template_id: int) -> Template
         sat_fat_g=spec.sat_fat_g,
         sodium_mg=spec.sodium_mg,
     )
+
+
+def _resolve_item_name(session: Session, *, food_id: int | None, name: str | None) -> str:
+    """Fill in a template item's name when omitted (§MCP-09).
+
+    An explicit name is always honored as-is (template item names have always
+    been stored verbatim, independent of the referenced food's own name). When
+    omitted and food_id is set, falls back to that food's current name.
+    Ad-hoc items (food_id None) have no other source of a name, so an omitted
+    name there is a domain error rather than a NOT NULL constraint failure.
+    """
+
+    normalized = (name or "").strip()
+    if normalized:
+        return normalized
+
+    if food_id is not None:
+        food = session.get(Food, food_id)
+        if food is None:
+            raise FoodNotFoundError(f"id:{food_id}")
+        return food.name
+
+    raise AdhocItemNameRequiredError()
 
 
 def _scale_macro(value: Decimal | None, scale: Decimal) -> Decimal | None:

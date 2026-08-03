@@ -68,7 +68,11 @@ NumericDecimal = Annotated[Decimal, WithJsonSchema({"type": "number"})]
 
 
 class MealItemInput(BaseModel):
-    name: str = Field(min_length=1)
+    # Optional when food_id is set: the domain layer fills it in from the
+    # resolved food's current name. Required when food_id is None (ad-hoc
+    # items have no other source of a name) — the domain layer raises a
+    # clear error if both are omitted.
+    name: str | None = Field(default=None, min_length=1)
     quantity: NumericDecimal
     quantity_unit: QuantityUnit
     food_id: int | None = None
@@ -82,7 +86,11 @@ class MealItemInput(BaseModel):
 
 
 class TemplateItemInput(BaseModel):
-    name: str = Field(min_length=1)
+    # Optional when food_id is set: the domain layer fills it in from the
+    # referenced food's current name. Required when food_id is None (ad-hoc
+    # items have no other source of a name) — the domain layer raises a
+    # clear error if both are omitted.
+    name: str | None = Field(default=None, min_length=1)
     quantity: NumericDecimal
     quantity_unit: QuantityUnit
     food_id: int | None = None

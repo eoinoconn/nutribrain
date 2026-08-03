@@ -24,6 +24,7 @@ from app.domain import (
     update_template,
 )
 from app.domain.dto import TemplateResponse
+from app.domain.errors import AdhocItemNameRequiredError
 
 
 @pytest.fixture
@@ -122,6 +123,74 @@ class TestCreateTemplate:
         )
 
         assert len(result.items) == 2
+
+    def test_create_food_linked_item_name_omitted_uses_food_name(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        """MCP-09: name is optional when food_id is set; falls back to the food's name."""
+
+        result = create_template(
+            db_session,
+            name="Morning Oats",
+            items=[
+                TemplateItemSpec(
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                    # name omitted entirely
+                ),
+            ],
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].name == sample_food.name
+
+    def test_create_food_linked_item_explicit_name_still_works(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        """MCP-09: an explicit name on a food-linked template item is honored as-is.
+
+        Unlike log_meal (which always overrides a food-linked item's name with
+        the food's current name), template items have always stored the
+        caller-supplied name verbatim. This test confirms that pre-existing
+        behavior is preserved for this change.
+        """
+
+        result = create_template(
+            db_session,
+            name="Morning Oats",
+            items=[
+                TemplateItemSpec(
+                    name="My Oats",
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                ),
+            ],
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].name == "My Oats"
+
+    def test_create_adhoc_item_name_omitted_raises(self, db_session: Session) -> None:
+        """MCP-09: an ad-hoc item (no food_id) with no name raises a clear domain error."""
+
+        with pytest.raises(AdhocItemNameRequiredError):
+            create_template(
+                db_session,
+                name="Quick Snack",
+                items=[
+                    TemplateItemSpec(
+                        quantity=Decimal("50"),
+                        quantity_unit=QuantityUnit.g,
+                        calories=Decimal("220"),
+                        protein_g=Decimal("5"),
+                        carbs_g=Decimal("30"),
+                        fat_g=Decimal("10"),
+                        # No food_id, no name, macros supplied
+                    ),
+                ],
+            )
 
 
 class TestUpdateTemplate:

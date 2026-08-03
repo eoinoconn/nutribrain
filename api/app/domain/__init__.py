@@ -28,6 +28,7 @@ from app.domain.dto import (
     TemplateResponse,
 )
 from app.domain.errors import (
+    AdhocItemNameRequiredError,
     DomainError,
     FoodAmbiguousError,
     FoodDuplicateError,
@@ -87,6 +88,7 @@ from app.domain.templates import (
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
     "AddFoodResult",
+    "AdhocItemNameRequiredError",
     "DayMealGroup",
     "DayResponse",
     "DomainError",

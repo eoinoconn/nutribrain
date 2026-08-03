@@ -46,6 +46,21 @@ class FoodNotFoundError(DomainError):
         )
 
 
+class AdhocItemNameRequiredError(DomainError):
+    """An ad-hoc item (food_id is None) was given no name.
+
+    Food-linked items can fall back to the resolved food's current name, but
+    an ad-hoc item has no other source of a name, so omitting it is rejected
+    here rather than left to fail an opaque NOT NULL constraint at write time.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            error="adhoc_item_name_required",
+            message="An ad-hoc item (no food_id) requires a name.",
+        )
+
+
 class FoodAmbiguousError(DomainError):
     """More than one candidate matched and no tie-breaker rule selected one."""
 

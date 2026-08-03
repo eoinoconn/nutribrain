@@ -184,3 +184,94 @@ async def test_add_food_tool_accepts_numeric_strings_for_decimal_fields(
     payload = result.structured_content["result"]
     assert payload["calories"] == "389.5"
     assert payload["protein_g"] == "16.7"
+
+
+@pytest.mark.asyncio
+async def test_log_meal_tool_food_linked_item_name_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_food: Callable[..., Food],
+) -> None:
+    """MCP-09: items[].name is optional on food-linked items."""
+    food = make_food(name="Oats")
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool(
+        "log_meal",
+        {
+            "items": [
+                {
+                    "quantity": 50,
+                    "quantity_unit": "g",
+                    "food_id": food.id,
+                    # name omitted entirely
+                }
+            ]
+        },
+    )
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["items"][0]["food_id"] == food.id
+    assert payload["items"][0]["name"] == "Oats"
+
+
+@pytest.mark.asyncio
+async def test_log_meal_tool_adhoc_item_name_omitted_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+) -> None:
+    """MCP-09: an ad-hoc item (no food_id) with no name is a clear domain error."""
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool(
+        "log_meal",
+        {
+            "items": [
+                {
+                    "quantity": 100,
+                    "quantity_unit": "g",
+                    "calories": 150,
+                    "protein_g": 5,
+                    "carbs_g": 25,
+                    "fat_g": 4,
+                    # No food_id, no name
+                }
+            ]
+        },
+    )
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["error"] == "adhoc_item_name_required"
+
+
+@pytest.mark.asyncio
+async def test_create_template_tool_food_linked_item_name_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+    db_session: Session,
+    make_food: Callable[..., Food],
+) -> None:
+    """MCP-09: items[].name is optional on food-linked template items."""
+    food = make_food(name="Oats")
+    _patch_run_with_session(monkeypatch, db_session)
+
+    result = await mcp.call_tool(
+        "create_template",
+        {
+            "name": "Morning Oats",
+            "items": [
+                {
+                    "quantity": 80,
+                    "quantity_unit": "g",
+                    "food_id": food.id,
+                    # name omitted entirely
+                }
+            ],
+        },
+    )
+
+    assert result.is_error is False
+    payload = result.structured_content["result"]
+    assert payload["items"][0]["food_id"] == food.id
+    assert payload["items"][0]["name"] == "Oats"

@@ -31,11 +31,16 @@ class FoodCandidate:
 
 @dataclass(frozen=True, slots=True)
 class MealItemSpec:
-    """Input spec for a single item being logged (§4)."""
+    """Input spec for a single item being logged (§4).
 
-    name: str
+    ``name`` is optional when ``food_id`` is set — the domain layer fills it
+    in from the resolved food's current name. It is required when ``food_id``
+    is None (ad-hoc items have no other source of a name).
+    """
+
     quantity: Decimal
     quantity_unit: QuantityUnit
+    name: str | None = None
     food_id: int | None = None
     calories: Decimal | None = None
     protein_g: Decimal | None = None
@@ -95,11 +100,16 @@ class MealItemMatch:
 
 @dataclass(frozen=True, slots=True)
 class TemplateItemSpec:
-    """Input spec for a single template item."""
+    """Input spec for a single template item.
 
-    name: str
+    ``name`` is optional when ``food_id`` is set — the domain layer fills it
+    in from the referenced food's current name. It is required when
+    ``food_id`` is None (ad-hoc items have no other source of a name).
+    """
+
     quantity: Decimal
     quantity_unit: QuantityUnit
+    name: str | None = None
     food_id: int | None = None
     calories: Decimal | None = None
     protein_g: Decimal | None = None
