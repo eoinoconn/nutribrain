@@ -251,6 +251,35 @@ describe("DayView", () => {
     expect(screen.queryByRole("button", { name: /sync intervals now/i })).not.toBeInTheDocument();
   });
 
+  describe("energy balance chart (EC-10)", () => {
+    function makeEnergy(): NonNullable<DayResponse["energy"]> {
+      return {
+        points: [{ at: `${todayIso()}T08:00:00Z`, balance: 200 }],
+        forecastPoints: [{ at: `${todayIso()}T20:00:00Z`, balance: 500 }],
+        events: [],
+        currentBalance: 200,
+        predictedEndOfDay: 500,
+        endOfDayTarget: 600,
+        fuelingFlags: []
+      };
+    }
+
+    it("renders the Live Energy section on today's date when energy data is present", async () => {
+      mockedGetDay.mockResolvedValue(makeDay({ date: todayIso(), energy: makeEnergy() }));
+      renderPage("/");
+
+      expect(await screen.findByRole("heading", { name: /live energy/i })).toBeInTheDocument();
+    });
+
+    it("does not render the Live Energy section on a non-today date", async () => {
+      mockedGetDay.mockResolvedValue(makeDay({ date: "2026-07-20", energy: makeEnergy() }));
+      renderPage("/day/2026-07-20");
+
+      await screen.findByText("no meals logged this day");
+      expect(screen.queryByRole("heading", { name: /live energy/i })).not.toBeInTheDocument();
+    });
+  });
+
   it("shows the sync button when the route resolves to today", async () => {
     mockedGetDay.mockResolvedValue(makeDay({ date: todayIso() }));
     mockedSyncIntervals.mockResolvedValue({ fromDate: todayIso(), toDate: todayIso(), daysSynced: 1, failures: [] });
