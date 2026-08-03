@@ -322,6 +322,23 @@ export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartP
   const ticks = domain ? computeHourTicks(domain[0], domain[1]) : undefined;
   const eventData = buildEventScatterData(energy.events, rows);
 
+  // recharts computes a shared axis's auto min/max from whichever series
+  // happen to feed it, and mixing a chart-level-`data` Line series with a
+  // separately-`data`-provided Scatter series (as here) makes that
+  // computation unreliable -- observed dropping the Line's true range in
+  // favor of just the Scatter's, clipping the line off the bottom/top of
+  // the plot instead of scaling to fit it. Computing the Y domain
+  // ourselves, from every value actually rendered, sidesteps that entirely
+  // rather than depending on recharts to get it right across mixed sources.
+  const yValues = [
+    ...rows.flatMap((row) => [row.actualBalance, row.forecastBalance].filter((v): v is number => v !== null)),
+    ...eventData.map((d) => d.balance)
+  ];
+  const yMin = yValues.length > 0 ? Math.min(...yValues) : 0;
+  const yMax = yValues.length > 0 ? Math.max(...yValues) : 0;
+  const yPadding = Math.max(10, (yMax - yMin) * 0.1);
+  const yDomain: [number, number] = [Math.floor(yMin - yPadding), Math.ceil(yMax + yPadding)];
+
   return (
     <div className="space-y-3">
       <div className="h-64 w-full" role="img" aria-label="Line chart of energy balance for the day, actual and forecast">
@@ -335,7 +352,7 @@ export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartP
               tickFormatter={formatTimeMs}
               tick={{ fontSize: 12 }}
             />
-            <YAxis tick={{ fontSize: 12 }} width={48} />
+            <YAxis domain={yDomain} tick={{ fontSize: 12 }} width={48} />
             <Tooltip
               labelFormatter={(label: number) => formatTimeMs(label)}
               formatter={(value: number | string | Array<number | string>, name: string | number) =>

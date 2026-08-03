@@ -79,6 +79,43 @@ describe("EnergyChart", () => {
     expect(scatterLayer?.querySelectorAll(".recharts-scatter-symbol")).toHaveLength(3);
   });
 
+  it("keeps the whole line within the plotted chart area, including a deep dip between sparse meals", () => {
+    // Regression test: recharts computes a shared axis's auto min/max
+    // unreliably when a chart-level-`data` Line series and a
+    // separately-`data` Scatter series both feed it — observed dropping the
+    // Line's true range in favor of the Scatter's narrower one, clipping a
+    // deep basal-drain dip off the bottom of the plot (it would render, then
+    // get cut off by the chart's clipPath, then jump back in from off-screen
+    // at the next point). The Y domain is now computed explicitly from every
+    // rendered value instead of trusting recharts' auto-scale here.
+    const energy = makeEnergy({
+      points: [
+        { at: "2026-08-03T01:00:00Z", balance: 0 },
+        { at: "2026-08-03T09:00:00Z", balance: -600 },
+        { at: "2026-08-03T09:00:00Z", balance: -200 }
+      ],
+      forecastPoints: [{ at: "2026-08-03T09:00:00Z", balance: -200 }],
+      events: [{ at: "2026-08-03T09:00:00Z", deltaKcal: 400, kind: "meal", status: null }],
+      currentBalance: -200
+    });
+    const { container } = render(<EnergyChart energy={energy} isLoading={false} isToday={false} />);
+
+    const svg = container.querySelector("svg.recharts-surface");
+    const height = Number(svg?.getAttribute("height"));
+    const linePath = container.querySelector("path.recharts-line-curve");
+    const pathD = linePath?.getAttribute("d") ?? "";
+    // Every "y" coordinate in the path's M/L commands (every other number
+    // after the leading x) must fall within the SVG's own height -- if the
+    // domain were wrong, the -600 dip would produce a y value far past it.
+    const numbers = pathD.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+    const yCoords = numbers.filter((_, i) => i % 2 === 1);
+    expect(yCoords.length).toBeGreaterThan(0);
+    for (const y of yCoords) {
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(height);
+    }
+  });
+
   it("renders the text-equivalent summary with current balance and predicted end of day", () => {
     render(<EnergyChart energy={makeEnergy()} isLoading={false} isToday={true} />);
 
