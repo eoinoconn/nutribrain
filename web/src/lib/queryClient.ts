@@ -15,6 +15,7 @@
  *   queryKeys.templates()           -> ['templates']
  *   queryKeys.syncStatus()          -> ['sync', 'status']
  *   queryKeys.range(from, to, g)    -> ['range', from, to, g]
+ *   queryKeys.settings()            -> ['settings']
  *
  * `queryKeys.targets(localDate)` scopes the per-day *effective* target
  * (`GET /api/targets/effective?date=`, a different shape from the raw
@@ -42,7 +43,8 @@ export const queryKeys = {
   templates: () => ["templates"] as const,
   syncStatus: () => ["sync", "status"] as const,
   range: (from: string, to: string, granularity: string = "day") =>
-    ["range", from, to, granularity] as const
+    ["range", from, to, granularity] as const,
+  settings: () => ["settings"] as const
 };
 
 function isAuthError(error: unknown): boolean {

@@ -1,0 +1,15 @@
+[
+  {
+    "id": "e1",
+    "start_date_local": "2026-08-05T06:00:00",
+    "moving_time": 5400,
+    "type": "Ride",
+    "icu_joules": 2100000
+  },
+  {
+    "id": "e2",
+    "start_date_local": "2026-08-06T17:00:00",
+    "elapsed_time": 2400,
+    "type": "Run"
+  }
+]

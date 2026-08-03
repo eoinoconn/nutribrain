@@ -12,24 +12,30 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session, session_scope
 from app.domain import get_sync_status, parse_local_date, set_manual_calories_out, sync_intervals
-from app.domain.intervals_sync import FetchCaloriesByDay, StatusSessionFactory
-from app.intervals.client import fetch_activity_calories_by_day
+from app.domain.intervals_sync import StatusSessionFactory
+from app.domain.planned_workouts import FetchActivitiesDetailed, FetchPlannedEvents
+from app.intervals.client import fetch_activities_detailed, fetch_planned_events
 from app.settings import settings
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 DbSession = Annotated[Session, Depends(get_session)]
 
 
-def get_intervals_fetch() -> FetchCaloriesByDay:
-    return fetch_activity_calories_by_day
-
-
 def get_status_session_factory() -> StatusSessionFactory:
     return session_scope
 
 
-FetchDep = Annotated[FetchCaloriesByDay, Depends(get_intervals_fetch)]
+def get_fetch_activities() -> FetchActivitiesDetailed:
+    return fetch_activities_detailed
+
+
+def get_fetch_planned() -> FetchPlannedEvents:
+    return fetch_planned_events
+
+
 StatusFactoryDep = Annotated[StatusSessionFactory, Depends(get_status_session_factory)]
+FetchActivitiesDep = Annotated[FetchActivitiesDetailed, Depends(get_fetch_activities)]
+FetchPlannedDep = Annotated[FetchPlannedEvents, Depends(get_fetch_planned)]
 
 
 # --- Response schemas -------------------------------------------------------
@@ -64,17 +70,19 @@ class ManualCaloriesOutResponse(BaseModel):
 @router.post("/intervals", response_model=SyncIntervalsResponse)
 def sync_intervals_route(
     session: DbSession,
-    fetch: FetchDep,
+    fetch_activities: FetchActivitiesDep,
+    fetch_planned: FetchPlannedDep,
     status_session_factory: StatusFactoryDep,
 ) -> SyncIntervalsResponse:
-    """Sync today's calories-out (§8 "Dashboard button")."""
+    """Sync today's planned_workouts (§8 "Dashboard button", EC-07)."""
 
     today = parse_local_date("today", local_tz=settings.tz)
     result = sync_intervals(
         session,
         from_date=today,
         to_date=today,
-        fetch=fetch,
+        fetch_activities=fetch_activities,
+        fetch_planned=fetch_planned,
         status_session_factory=status_session_factory,
     )
     return SyncIntervalsResponse(

@@ -102,14 +102,6 @@ export function buildQuickMacroRequest(value: QuickMacroValue, localDate: string
   };
 }
 
-/** `HH:mm` (input[type=time]) extracted from an ISO datetime, in the browser's local time. */
-export function timeFromIso(iso: string): string {
-  const parsed = new Date(iso);
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
-}
-
 /**
  * Converts an already-logged `MealItem` (wire shape, from `GET /api/day`)
  * into `MealEditorItem` UI state so an existing item can be prefilled into

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke-test intervals.icu activity-calorie fetch using api/.env settings.
+"""Smoke-test intervals.icu per-activity fetch using api/.env settings.
+
+Uses ``fetch_activities_detailed`` (EC-02) — the per-activity detail fetcher
+that feeds ``planned_workouts``, and that ``get_effective_target`` now sums
+for calories_out (EC-07). The old daily-sum ``fetch_activity_calories_by_day``
+this script used to smoke-test has been retired.
 
 Examples:
   uv run python scripts/check_intervals_client.py
@@ -76,7 +81,7 @@ def main() -> int:
     oldest, newest = _resolve_window(args)
 
     try:
-        from app.intervals import fetch_activity_calories_by_day  # type: ignore[import-not-found]
+        from app.intervals.client import fetch_activities_detailed  # type: ignore[import-not-found]
         from app.settings import settings  # type: ignore[import-not-found]
     except RuntimeError as exc:
         print("Could not load API settings from api/.env.")
@@ -89,20 +94,23 @@ def main() -> int:
     print(f"- window: {oldest.isoformat()} -> {newest.isoformat()}")
 
     try:
-        result = fetch_activity_calories_by_day(oldest=oldest, newest=newest)
+        result = fetch_activities_detailed(oldest=oldest, newest=newest)
     except Exception as exc:
         print("- status: FAILED")
         print(f"- error: {type(exc).__name__}: {exc}")
         return 1
 
     print("- status: OK")
-    print(f"- days returned: {len(result)}")
+    print(f"- activities returned: {len(result)}")
 
-    for day in sorted(result.keys()):
-        print(f"  {day.isoformat()}: {result[day]}")
+    for activity in sorted(result, key=lambda a: a.start_date_local):
+        print(
+            f"  {activity.start_date_local} [{activity.external_id}] "
+            f"{activity.sport_type}: {activity.calories} cal"
+        )
 
-    if result and all(value is None for value in result.values()):
-        print("- warning: every day returned None for activity calories")
+    if result and all(activity.calories is None for activity in result):
+        print("- warning: every activity returned None for calories")
         print("  This usually means activity rows in this range did not include a calories field.")
 
     return 0

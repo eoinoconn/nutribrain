@@ -25,8 +25,9 @@ def register_sync_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="sync_intervals",
         description=(
-            "Sync calories-out for a date range. Date args accept today/yesterday/ISO; "
-            "defaults to the last 7 days when omitted."
+            "Sync planned/completed workouts for a date range (calories-out is derived "
+            "from completed workouts at read time — see get_target). Date args accept "
+            "today/yesterday/ISO; defaults to the last 7 days when omitted."
         ),
     )
     def sync_intervals_tool(

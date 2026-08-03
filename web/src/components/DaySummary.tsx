@@ -8,15 +8,8 @@
  */
 
 import type { ReactNode } from "react";
-import type { DayResponse, ItemMacros, MealType } from "../lib/api/types";
-
-export function formatCalories(value: number): string {
-  return Math.round(value).toLocaleString();
-}
-
-export function formatGrams(value: number): string {
-  return value.toFixed(1);
-}
+import type { DayResponse, ItemMacros } from "../lib/api/types";
+import { formatCalories, formatGrams } from "./daySummaryHelpers";
 
 /**
  * Prev arrow / native date input / next arrow, styled per the app's
@@ -265,9 +258,3 @@ export function SummaryRow({
   );
 }
 
-export const MEAL_TYPE_LABELS: Record<MealType, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack"
-};

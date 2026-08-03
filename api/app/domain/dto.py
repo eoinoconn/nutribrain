@@ -5,8 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
-from app.db import MealItemSource, MealType, QuantityUnit
+from app.db import (
+    MealItemSource,
+    MealType,
+    PlannedWorkoutSource,
+    PlannedWorkoutStatus,
+    QuantityUnit,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,13 +185,22 @@ class DayMealGroup:
 
 @dataclass(frozen=True, slots=True)
 class DayResponse:
-    """Full day aggregation: meals grouped by type, totals, target, delta."""
+    """Full day aggregation: meals grouped by type, totals, target, delta.
+
+    ``energy`` (EC-08, §7) is the Live Energy timeline for the day, or
+    ``None`` when no target is set -- ``compute_energy_timeline`` raises
+    ``NoTargetSetError`` in that case, which ``get_day`` catches and
+    translates to ``None`` here, mirroring how ``effective_target`` /
+    ``delta_vs_target`` already tolerate a missing target gracefully.
+    """
 
     date: date
     meals: dict[MealType, list[DayMealGroup]]
     day_totals: ItemMacros
     effective_target: EffectiveTarget | None
     delta_vs_target: ItemMacros | None
+    energy: EnergyTimeline | None
+    workouts: list[PlannedWorkoutDTO]
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,9 +228,11 @@ class RangeResponse:
 class SyncIntervalsResult:
     """Result of one sync_intervals invocation (§8, T-061).
 
-    ``days_synced`` counts days actually written (a cached ``0`` counts; a
-    ``null`` day that was skipped does not). ``failures`` holds one entry per
-    day whose write failed, so the rest of the range can still succeed.
+    ``days_synced`` counts ``planned_workouts`` rows upserted (EC-07: the old
+    same-day calories-out sum this field used to count is retired —
+    ``get_effective_target`` derives ``calories_out`` from those rows at read
+    time instead). ``failures`` holds one entry per row whose write failed, so
+    the rest of the range can still succeed.
     """
 
     from_date: date
@@ -243,3 +261,104 @@ class ManualCaloriesOutResult:
     date: date
     calories_out: int
     fetched_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedWorkoutDTO:
+    """A planned/completed workout row, synced or manual (EC-01/EC-04, §6).
+
+    Mirrors the ``planned_workouts`` table 1:1. A manually-entered row
+    (``source='manual'``) has ``external_id``, ``sport_type``, ``icu_joules``,
+    and ``actual_calories`` all None — see the model's column comments.
+    """
+
+    id: int
+    external_id: str | None
+    source: PlannedWorkoutSource
+    local_date: date
+    start_at: datetime
+    duration_minutes: int
+    sport_type: str | None
+    icu_joules: int | None
+    estimated_calories: int | None
+    actual_calories: int | None
+    status: PlannedWorkoutStatus
+    fetched_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AppSettingsDTO:
+    """Account-level app settings singleton (§6a, EC-06).
+
+    Single-user app, no ``user_id`` — this is the one row of settings that
+    apply to the whole account. ``local_timezone`` is an IANA tz name (e.g.
+    ``"Europe/Dublin"``); the energy chart (EC-05) will read it to resolve
+    local-midnight bounds on days with no logged meal to infer a timezone
+    from.
+    """
+
+    local_timezone: str
+
+
+@dataclass(frozen=True, slots=True)
+class EnergyPoint:
+    """One point on the energy-balance line (EC-05, §5).
+
+    ``balance`` is the cumulative net kcal balance (intake minus basal drain
+    minus workout expenditure) at ``at``. Rounded to the nearest whole kcal
+    at this DTO boundary -- intermediate accumulation is done in ``Decimal``
+    inside ``compute_energy_timeline``, per ``docs/style.md``'s "round only
+    at final serialization" rule, and this DTO is treated as that boundary
+    for the domain function's public return value.
+    """
+
+    at: datetime
+    balance: int
+
+
+@dataclass(frozen=True, slots=True)
+class EnergyEvent:
+    """A marker on the energy chart: a meal or a workout step (EC-05, §5).
+
+    ``status`` is only meaningful for ``kind="workout"`` (``"planned"`` or
+    ``"completed"``); ``None`` for meals. ``delta_kcal`` is the signed step
+    applied at ``at`` -- positive for a meal, negative for a workout.
+    """
+
+    at: datetime
+    delta_kcal: int
+    kind: Literal["meal", "workout"]
+    status: Literal["planned", "completed"] | None
+
+
+@dataclass(frozen=True, slots=True)
+class FuelingFlag:
+    """Fueling classification for a future planned workout (EC-05, §5).
+
+    Evaluated at the cumulative balance immediately before the workout's own
+    step is applied on the dashed/forecast line -- i.e. "how fueled are you
+    going into this session," not the balance after subtracting it.
+    """
+
+    workout_id: int
+    at: datetime
+    status: Literal["well_fueled", "under_fueled"]
+
+
+@dataclass(frozen=True, slots=True)
+class EnergyTimeline:
+    """Full energy-balance timeline for one local day (EC-05, §5).
+
+    ``points`` is the solid "so far" line from local midnight to ``now``;
+    ``forecast_points`` is the dashed line continuing from ``now`` to local
+    end-of-day under a zero-further-intake assumption (already-logged future
+    meals and future planned workouts are still included as known steps).
+    """
+
+    points: list[EnergyPoint]
+    forecast_points: list[EnergyPoint]
+    events: list[EnergyEvent]
+    current_balance: int
+    predicted_end_of_day: int
+    end_of_day_target: int
+    fueling_flags: list[FuelingFlag]

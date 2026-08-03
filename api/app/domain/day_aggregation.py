@@ -7,13 +7,13 @@ foods are loaded in a fixed number of queries regardless of data volume.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import Food, IntervalsCaloriesOut, Meal, MealType, Target
+from app.db import Food, Meal, MealType, Target
 from app.domain.dto import (
     DayMealGroup,
     DayResponse,
@@ -23,23 +23,44 @@ from app.domain.dto import (
     PeriodTotals,
     RangeResponse,
 )
+from app.domain.energy_balance import compute_energy_timeline
+from app.domain.errors import NoTargetSetError
 from app.domain.nutrition_math import compute_item_macros
+from app.domain.planned_workouts import list_planned_workouts_for_day
+from app.domain.targets import get_effective_target, resolve_calories_out_map
 
 
-def get_day(session: Session, *, day: date) -> DayResponse:
+def get_day(session: Session, *, day: date, now: datetime | None = None) -> DayResponse:
     """Aggregate a single day: meals grouped by type, totals, target, delta.
 
     Loads meals + items + foods in bounded queries (no N+1). Macros are computed
     at read time from the current food nutrition values.
 
+    Also folds in the Live Energy timeline (EC-05/EC-08, §7) as the ``energy``
+    field. This mirrors ``effective_target``/``delta_vs_target``'s existing
+    graceful handling of a missing target: rather than letting
+    ``compute_energy_timeline``'s ``NoTargetSetError`` fail the whole day
+    request, ``energy`` is simply ``None`` when no target is set for ``day``.
+    ``compute_energy_timeline`` itself makes sense for any day (past, today,
+    or future) -- the "only meaningful for today" gating is a frontend (§8)
+    concern, not a domain one.
+
     Args:
         session: Active SQLAlchemy session.
         day: The local_date to aggregate.
+        now: Timezone-aware "current instant" used as the energy timeline's
+            solid/dashed split point (defaults to UTC now, following this
+            codebase's existing ``now: datetime | None = None`` convention,
+            e.g. ``meal_logging.log_meal``, ``intervals_sync.sync_intervals``).
 
     Returns:
         DayResponse with meals grouped by meal_type, day totals, effective
-        target, and delta vs. target.
+        target, delta vs. target, the energy timeline (or None if no target
+        is set for the day), and every planned_workouts row for the day
+        (any source/status) for display alongside the meal list.
     """
+
+    resolved_now = now or datetime.now(UTC)
 
     # One query: meals with items eagerly loaded for this day
     meals = _load_meals_for_dates(session, day, day)
@@ -81,12 +102,21 @@ def get_day(session: Session, *, day: date) -> DayResponse:
             sodium_mg=day_totals.sodium_mg,
         )
 
+    try:
+        energy = compute_energy_timeline(session, day=day, now=resolved_now)
+    except NoTargetSetError:
+        energy = None
+
+    workouts = list_planned_workouts_for_day(session, day=day)
+
     return DayResponse(
         date=day,
         meals=grouped,
         day_totals=day_totals,
         effective_target=effective_target,
         delta_vs_target=delta,
+        energy=energy,
+        workouts=workouts,
     )
 
 
@@ -206,34 +236,13 @@ def _compute_meal_items(
 
 
 def _get_effective_target(session: Session, day: date) -> EffectiveTarget | None:
-    """Compute the effective target for a single day."""
+    """Compute the effective target for a single day.
 
-    target = session.scalar(
-        select(Target)
-        .where(Target.effective_from <= day)
-        .order_by(Target.effective_from.desc())
-        .limit(1)
-    )
-    if target is None:
-        return None
+    Delegates to ``targets.get_effective_target`` (EC-07) so this module has
+    no separate calories_out sourcing to keep in sync with the target panel.
+    """
 
-    cached_out = session.scalar(
-        select(IntervalsCaloriesOut).where(IntervalsCaloriesOut.date == day)
-    )
-    calories_out = cached_out.calories_out if cached_out is not None else None
-    effective_calories = target.base_calories
-    if calories_out is not None:
-        effective_calories += calories_out
-
-    return EffectiveTarget(
-        effective_from=target.effective_from,
-        base_calories=target.base_calories,
-        protein_g=target.protein_g,
-        carbs_g=target.carbs_g,
-        fat_g=target.fat_g,
-        calories_out=calories_out,
-        effective_calories=effective_calories,
-    )
+    return get_effective_target(session, day=day)
 
 
 def _get_effective_targets_for_range(
@@ -243,7 +252,8 @@ def _get_effective_targets_for_range(
 ) -> dict[date, EffectiveTarget]:
     """Batch-load effective targets for a date range in bounded queries.
 
-    Loads all targets and calories_out rows that could apply, then computes
+    Loads all targets and resolves calories_out (EC-07: completed
+    planned_workouts, or a manual override) for the range, then computes
     per-day effective targets in memory.
     """
 
@@ -259,16 +269,7 @@ def _get_effective_targets_for_range(
     if not targets:
         return {}
 
-    # Load all calories_out in the range
-    calories_out_rows = list(
-        session.scalars(
-            select(IntervalsCaloriesOut).where(
-                IntervalsCaloriesOut.date >= from_date,
-                IntervalsCaloriesOut.date <= to_date,
-            )
-        )
-    )
-    calories_out_map = {row.date: row.calories_out for row in calories_out_rows}
+    calories_out_map = resolve_calories_out_map(session, from_date=from_date, to_date=to_date)
 
     # Build per-day targets
     result: dict[date, EffectiveTarget] = {}

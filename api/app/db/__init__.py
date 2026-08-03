@@ -1,6 +1,7 @@
 from app.db.base import Base
 from app.db.engine import SessionLocal, engine, get_session, session_scope
 from app.db.models import (
+    AppSettings,
     Food,
     IntervalsCaloriesOut,
     IntervalsSource,
@@ -10,6 +11,9 @@ from app.db.models import (
     MealItem,
     MealItemSource,
     MealType,
+    PlannedWorkout,
+    PlannedWorkoutSource,
+    PlannedWorkoutStatus,
     QuantityUnit,
     ServingUnit,
     Target,
@@ -18,6 +22,7 @@ from app.db.models import (
 )
 
 __all__ = [
+    "AppSettings",
     "Base",
     "Food",
     "IntervalsCaloriesOut",
@@ -28,6 +33,9 @@ __all__ = [
     "MealItem",
     "MealItemSource",
     "MealType",
+    "PlannedWorkout",
+    "PlannedWorkoutSource",
+    "PlannedWorkoutStatus",
     "QuantityUnit",
     "ServingUnit",
     "SessionLocal",

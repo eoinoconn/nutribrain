@@ -104,6 +104,41 @@ FastAPI's `dependencies=[Depends(require_auth)]` on a router **does not** apply 
 
 ## Questions and future amendments
 
+### D-005 — EC-03's planned→completed correlation guess was wrong; corrected via the vendored OpenAPI spec (2026-08-03)
+
+**Background:** EC-03 (`docs/features/energy_balance_chart.md` §6) needed to
+recognize when a completed activity synced from intervals.icu corresponds to
+an earlier-synced planned event, so the planned row can flip in place instead
+of leaving a stale duplicate. At the time, `ActivityDetail`/`PlannedEventDetail`
+exposed no documented linking field, so EC-03 shipped a guess: match on a
+*shared* `external_id` across the two sources.
+
+**Empirical result:** wrong. Observed in production (a real synced Swim
+workout): the calendar event and its resulting completed activity had two
+different, unrelated ids. The guessed correlation never fired, so the app
+showed two markers for one real workout — a stale "planned" entry that never
+flipped, sitting alongside a separately-created "completed" one.
+
+**Decision:** the user pointed at `docs/intervals-icu-openapi.json` (the
+vendored intervals.icu OpenAPI spec, added to the repo in the same change) as
+the authoritative source instead of guessing further. It documents
+`Activity.paired_event_id` (int) — a completed activity's direct link back to
+the calendar event's own `id` (not that event's `external_id` field, and not
+the activity's own `id`/`external_id`, a separate string id space).
+
+`planned_workouts` gained a `paired_event_id` column (migration
+`fb08520700c4`) to persist this link independently of `external_id`, since
+flipping a row also rewrites its `external_id` to the activity's own id (for
+`/activities/{id}` links and idempotent re-sync) — `paired_event_id` is what
+lets a later `/events` sync still recognize "this event is already
+completed" once `external_id` no longer reflects the original event.
+
+**Migration cleanup:** rows already duplicated under the old guess (both a
+stale planned row and a separately-created completed row for the same real
+workout) are consolidated on the next sync — see
+`_upsert_completed_activity`'s "both exist" branch in
+`api/app/domain/planned_workouts.py`. No manual data cleanup required.
+
 ### D-004 — Frontend token localStorage key: spec wins over backlog task text (2026-07-27)
 
 **Conflict:** backlog task T-070's own text specified the token localStorage

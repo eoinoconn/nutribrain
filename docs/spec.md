@@ -200,17 +200,17 @@ Daily base targets, versioned by effective date.
 | fat_g | integer | |
 | created_at | timestamptz | |
 
-Effective target for a given day = most recent target where `effective_from <= day`, plus `intervals_calories_out.calories_out` for that day if present.
+Effective target for a given day = most recent target where `effective_from <= day`, plus `calories_out` for that day: `sum(planned_workouts.actual_calories where status='completed' and local_date=day)`, unless a manual override row exists in `intervals_calories_out` (`source='manual'`), which wins (EC-07, "Reconciling calories-out" in `docs/features/energy_balance_chart.md`).
 
 #### `intervals_calories_out`
-Cache of intervals.icu daily calories expended.
+Manual calories-out override only (EC-07). Previously also populated by a same-day sync of intervals.icu activities (`source='sync'`); that sync path is retired — `calories_out` is now derived from `planned_workouts` at read time (see above), and this table is written only via the manual-override path.
 
 | Column | Type | Notes |
 |---|---|---|
 | date | date PK | |
 | calories_out | integer | |
 | fetched_at | timestamptz | |
-| source | enum(`sync`,`manual`) default `sync` | Distinguishes a synced value from a dashboard override, so the UI can show which days were hand-set |
+| source | enum(`sync`,`manual`) default `sync` | Only `manual` rows are written today; `sync` remains the column default for schema continuity. A `manual` row always wins over the `planned_workouts` sum. |
 
 ### Indices
 - `meals(local_date)` — the load-bearing index for day/week views
@@ -592,17 +592,17 @@ Used in Today, Day detail, and template management:
 ## 8. intervals.icu integration
 
 ### Purpose
-- Pull daily calories-out into the local cache
-- Feed dynamic target: `effective_target = base_target + calories_out(date)`
+- Pull planned and completed workouts into `planned_workouts` (EC-01/EC-02/EC-03)
+- Feed dynamic target: `effective_target = base_target + calories_out(date)`, where `calories_out(date)` is derived from `planned_workouts` at read time (EC-07, "Reconciling calories-out" in `docs/features/energy_balance_chart.md`)
 - Read-only; no writes back to intervals
 
 ### Data flow
 
 ```
-intervals.icu API ──► sync worker ──► intervals_calories_out cache ──► domain layer ──► /api & /mcp
+intervals.icu API ──► sync worker ──► planned_workouts ──► domain layer (calories_out derived at read time) ──► /api & /mcp
 ```
 
-The cache is the source of truth for reads. Only the sync worker writes it.
+`planned_workouts` is the source of truth for synced reads; a manual override in `intervals_calories_out` (`source='manual'`) still wins when present. Only the sync worker writes `planned_workouts`; only the manual-override route/tool writes `intervals_calories_out`.
 
 ### intervals API details
 
@@ -1025,6 +1025,9 @@ Error codes agents should handle:
 - `serving_unit_immutable` — `update_food` attempt to change serving unit
 - `template_not_found`
 - `intervals_unavailable` — sync failed
+- `invalid_timezone` — `PATCH /api/settings` received a value that isn't a valid IANA timezone name
+- `naive_datetime` — a timestamp field (e.g. `POST /api/planned-workouts` `start_at`) is missing a UTC offset
+- `no_target_set` — `compute_energy_timeline` was asked for a day with no effective target set
 
 ## Appendix D — Sequence: label scan → log
 

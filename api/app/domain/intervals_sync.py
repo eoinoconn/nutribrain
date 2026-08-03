@@ -1,36 +1,43 @@
 """intervals.icu sync worker and status (§8, T-061, T-045).
 
 One shared function backs all three triggers (nightly cron, on-demand MCP
-tool, dashboard button). Missing-data rules are load-bearing: a ``None`` day
-from the client writes no row ("no data"); a ``0`` day writes a genuine zero
-(a rest day). Getting this backwards silently corrupts every effective
-target computed from the cache.
+tool, dashboard button). It upserts ``planned_workouts`` rows for the synced
+range (EC-03, §6 "Sync changes") via ``sync_planned_workouts``.
+``get_effective_target`` (``app/domain/targets.py``) derives ``calories_out``
+from those rows at read time (EC-07, "Reconciling calories-out") — this
+module no longer independently syncs a same-day calories-out sum into
+``intervals_calories_out``; that table now only holds manual-override rows
+(``set_manual_calories_out`` below).
 
-Each day is written in its own savepoint so a failure on one day doesn't
-lose already-synced days in the same range — the range still fails loudly
-if the upstream fetch itself fails (auth/network), since there is nothing
-to write in that case. The single-row ``intervals_sync_status`` table records
-the last outcome so the dashboard can show "last sync N hours ago" / an error
-banner even for cron runs, which happen in a separate process from the web
-dyno.
+Each planned-workout row is written in its own savepoint so a failure on one
+row doesn't lose the rest of the same-range sync — the range still fails
+loudly if an upstream fetch itself fails (auth/network), since there is
+nothing to write in that case. The single-row ``intervals_sync_status`` table
+records the last outcome so the dashboard can show "last sync N hours ago" /
+an error banner even for cron runs, which happen in a separate process from
+the web dyno.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
 from app.db import IntervalsCaloriesOut, IntervalsSource, IntervalsSyncStatus, session_scope
 from app.domain.dto import ManualCaloriesOutResult, SyncIntervalsResult, SyncStatus
-from app.intervals.client import fetch_activity_calories_by_day
+from app.domain.planned_workouts import (
+    FetchActivitiesDetailed,
+    FetchPlannedEvents,
+    sync_planned_workouts,
+)
+from app.intervals.client import fetch_activities_detailed, fetch_planned_events
 from app.logging import get_logger
 
 logger = get_logger(__name__)
 
-FetchCaloriesByDay = Callable[..., dict[date, int | None]]
 StatusSessionFactory = Callable[[], AbstractContextManager[Session]]
 
 _STATUS_ROW_ID = 1
@@ -42,17 +49,25 @@ def sync_intervals(
     from_date: date,
     to_date: date,
     now: datetime | None = None,
-    fetch: FetchCaloriesByDay = fetch_activity_calories_by_day,
+    fetch_activities: FetchActivitiesDetailed = fetch_activities_detailed,
+    fetch_planned: FetchPlannedEvents = fetch_planned_events,
     status_session_factory: StatusSessionFactory = session_scope,
 ) -> SyncIntervalsResult:
-    """Sync calories-out for ``[from_date, to_date]`` inclusive.
+    """Sync ``planned_workouts`` for ``[from_date, to_date]`` inclusive.
 
-    Raises whatever the fetch callable raises (``IntervalsUnavailableError``
-    on upstream failure) — there is nothing to write if the fetch itself
-    failed, so that propagates uncaught, and the failure is recorded on the
-    status row before re-raising. Per-day write failures instead are caught,
-    logged, and recorded in the result so the rest of the range still syncs;
-    the sync as a whole still counts as successful for status purposes.
+    One shared function backs all three triggers (cron, the manual sync
+    route, the MCP tool) via ``sync_planned_workouts``. ``get_effective_target``
+    computes ``calories_out`` from the synced rows at read time (EC-07) — this
+    function no longer writes ``intervals_calories_out`` itself (the old
+    ``fetch_activity_calories_by_day`` daily-sum path is retired; that table
+    is now written only by ``set_manual_calories_out``, for manual overrides).
+
+    Raises whatever a fetch callable raises (``IntervalsUnavailableError`` on
+    upstream failure) — there is nothing to write if the fetch itself failed,
+    so that propagates uncaught, and the failure is recorded on the status
+    row before re-raising. Per-row write failures instead are caught, logged,
+    and appended to ``failures`` so the rest of the range still syncs; the
+    sync as a whole still counts as successful for status purposes.
 
     ``status_session_factory`` defaults to a fresh, independently-committed
     session (see ``_record_sync_failure``) — tests override it to keep status
@@ -65,36 +80,17 @@ def sync_intervals(
     resolved_now = now or datetime.now(UTC)
 
     try:
-        calories_by_day = fetch(oldest=from_date, newest=to_date)
+        workout_result = sync_planned_workouts(
+            session,
+            from_date=from_date,
+            to_date=to_date,
+            now=resolved_now,
+            fetch_activities=fetch_activities,
+            fetch_planned=fetch_planned,
+        )
     except Exception as exc:
         _record_sync_failure(status_session_factory, error=str(exc))
         raise
-
-    days_synced = 0
-    failures: list[dict[str, object]] = []
-
-    day = from_date
-    while day <= to_date:
-        calories_out = calories_by_day.get(day)
-        if calories_out is not None:
-            try:
-                with session.begin_nested():
-                    _upsert_calories_out(
-                        session,
-                        day=day,
-                        calories_out=calories_out,
-                        fetched_at=resolved_now,
-                        source=IntervalsSource.sync,
-                    )
-                days_synced += 1
-            except Exception as exc:  # isolate one bad day, keep syncing the rest
-                logger.warning(
-                    "intervals_sync_day_failed",
-                    date=day.isoformat(),
-                    error=str(exc),
-                )
-                failures.append({"date": day.isoformat(), "error": str(exc)})
-        day += timedelta(days=1)
 
     _record_sync_success(status_session_factory, synced_at=resolved_now)
 
@@ -102,15 +98,15 @@ def sync_intervals(
         "intervals_sync_completed",
         from_date=from_date.isoformat(),
         to_date=to_date.isoformat(),
-        days_synced=days_synced,
-        failure_count=len(failures),
+        workouts_synced=workout_result.workouts_synced,
+        failure_count=len(workout_result.failures),
     )
 
     return SyncIntervalsResult(
         from_date=from_date,
         to_date=to_date,
-        days_synced=days_synced,
-        failures=failures,
+        days_synced=workout_result.workouts_synced,
+        failures=workout_result.failures,
     )
 
 
