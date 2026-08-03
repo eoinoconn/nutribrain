@@ -20,16 +20,8 @@
  * always rendered beneath the chart.
  */
 
-import {
-  ComposedChart,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Scatter,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
+import type { TooltipProps } from "recharts";
+import { ComposedChart, Line, ReferenceLine, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from "recharts";
 import type { EnergyEvent, EnergyTimeline, FuelingFlag } from "../lib/api/types";
 import Skeleton from "../design/Skeleton";
 import EmptyState from "../design/EmptyState";
@@ -37,6 +29,7 @@ import EmptyState from "../design/EmptyState";
 const BALANCE_COLOR = "#c2410c"; // accent (orange-700, matches TrendsPage's calorie line)
 const FORECAST_COLOR = "#c2410c"; // same hue, dashed strokeDasharray distinguishes it as forecast
 const NOW_LINE_COLOR = "#71717a"; // ink-tertiary (zinc-500), matches TrendsPage's target overlay muting
+const ZERO_LINE_COLOR = "#d4d4d8"; // zinc-300, a light neutral baseline
 const EVENT_MEAL_COLOR = "#0284c7"; // sky-600, distinct series from the balance/forecast line
 const EVENT_WORKOUT_COLOR = "#7c3aed"; // violet-600, distinct from meal markers
 
@@ -67,7 +60,7 @@ const HOUR_MS = 60 * 60 * 1000;
  * that lands on arbitrary times like "7:56 AM" instead of round hours.
  * Builds ticks on the hour instead, spaced so there are roughly 5-7 of them
  * regardless of how long the domain span is. */
-function computeHourTicks(minMs: number, maxMs: number): number[] {
+export function computeHourTicks(minMs: number, maxMs: number): number[] {
   if (!(maxMs > minMs)) {
     return [minMs];
   }
@@ -86,6 +79,39 @@ function computeHourTicks(minMs: number, maxMs: number): number[] {
     ticks.push(t);
   }
   return ticks.length > 0 ? ticks : [minMs];
+}
+
+/** Rounds a raw tick step up to a "nice" 1/2/5-times-a-power-of-ten value —
+ * the standard nice-numbers axis algorithm — so gridlines land on round
+ * calorie counts (100, 200, 500, ...) instead of an arbitrary fraction of
+ * an odd data range. */
+function niceStep(rawStep: number): number {
+  if (!(rawStep > 0)) {
+    return 1;
+  }
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const residual = rawStep / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
+/** Y-axis equivalent of `computeHourTicks`: recharts' default auto-ticks on
+ * an arbitrary min/max (as this chart's padded data range is) don't land on
+ * round numbers or space evenly — observed jumps like 93, -402, -652, -902
+ * (a 495-unit gap next to two 250-unit gaps). Snaps the whole domain to a
+ * round step instead, so gridlines are evenly spaced round numbers. */
+export function computeYTicks(min: number, max: number, targetCount = 5): { domain: [number, number]; ticks: number[] } {
+  const safeMin = min === max ? min - 1 : min;
+  const safeMax = min === max ? max + 1 : max;
+  const step = niceStep((safeMax - safeMin) / targetCount);
+  const niceMin = Math.floor(safeMin / step) * step;
+  const niceMax = Math.ceil(safeMax / step) * step;
+
+  const ticks: number[] = [];
+  for (let t = niceMin; t <= niceMax + step / 2; t += step) {
+    ticks.push(Math.round(t));
+  }
+  return { domain: [niceMin, niceMax], ticks };
 }
 
 /** Categorical, non-alarming copy for each fueling status — never a bare signed number. */
@@ -124,6 +150,13 @@ interface ChartRow {
   originalAt: number;
   actualBalance: number | null;
   forecastBalance: number | null;
+  /** The balance to plot a marker at for this row's event, or null for rows
+   * with no event. Kept in the *same* shared row array as the Line series
+   * (rather than a separate array handed to `<Scatter>`) so every series
+   * shares one index space — see the comment on `<Scatter>` below for why
+   * that matters. */
+  eventMarker: number | null;
+  event: EnergyEvent | null;
 }
 
 /** Every step (a meal or workout) contributes two rows at the *same*
@@ -149,7 +182,7 @@ function buildChartRows(energy: EnergyTimeline): ChartRow[] {
     dupCount = originalAt === lastOriginalAt ? dupCount + 1 : 0;
     const at = dedupeStepTimestamp(originalAt, lastOriginalAt, dupCount);
     lastOriginalAt = originalAt;
-    rows.push({ at, originalAt, actualBalance, forecastBalance });
+    rows.push({ at, originalAt, actualBalance, forecastBalance, eventMarker: null, event: null });
   }
 
   energy.points.forEach((point) => {
@@ -170,19 +203,26 @@ function buildChartRows(energy: EnergyTimeline): ChartRow[] {
     pushRow(originalAt, null, point.balance);
   });
 
-  return rows;
-}
+  // Second pass: attach each event to its matching row (the later of the
+  // two same-timestamp rows for that step — the post-step balance) rather
+  // than building a separate array. `<Scatter>` reading from this same
+  // shared array, instead of its own independently-indexed `data` prop, is
+  // what actually fixes the tooltip-snaps-to-the-wrong-point bug: recharts
+  // resolves the hovered index separately per data source, so a Line series
+  // (chart-level `data`, ~a dozen rows) and a Scatter series (a handful of
+  // sparse event rows) could each resolve a *different* "nearest" row for
+  // the same mouse position and disagree on what the tooltip shows.
+  energy.events.forEach((event) => {
+    const atMs = new Date(event.at).getTime();
+    const matches = rows.filter((row) => row.originalAt === atMs);
+    const row = matches[matches.length - 1];
+    if (row) {
+      row.eventMarker = row.actualBalance ?? row.forecastBalance ?? 0;
+      row.event = event;
+    }
+  });
 
-/** The row (and its balance) the line is actually at when this event fires,
- * so its marker sits on the line instead of floating at the event's raw
- * delta_kcal (a previous bug: markers were positioned by step size, not by
- * the balance they occurred at). compute_energy_timeline emits two points
- * at a step's timestamp (before/after the jump) — take the later
- * (post-step) one, matching by the row's real (un-nudged) timestamp. */
-function rowAtEvent(event: EnergyEvent, rows: ChartRow[]): ChartRow | undefined {
-  const atMs = new Date(event.at).getTime();
-  const matches = rows.filter((row) => row.originalAt === atMs);
-  return matches[matches.length - 1];
+  return rows;
 }
 
 /** Meal vs. workout, and completed vs. still-only-planned, are distinguished
@@ -190,16 +230,12 @@ function rowAtEvent(event: EnergyEvent, rows: ChartRow[]): ChartRow | undefined 
  * (web/CLAUDE.md accessibility floor). A planned workout renders hollow to
  * flag it hasn't happened yet (and could still drop off after its 4-hour
  * grace period if never confirmed completed). */
-function EventMarkerShape(props: {
-  cx?: number;
-  cy?: number;
-  payload?: { event: EnergyEvent };
-}): JSX.Element {
+function EventMarkerShape(props: { cx?: number; cy?: number; payload?: ChartRow }): JSX.Element {
   const { cx, cy, payload } = props;
-  if (cx === undefined || cy === undefined || !payload) {
+  const event = payload?.event;
+  if (cx === undefined || cy === undefined || !event) {
     return <g />;
   }
-  const { event } = payload;
 
   if (event.kind === "meal") {
     return <circle cx={cx} cy={cy} r={5} fill={EVENT_MEAL_COLOR} stroke="white" strokeWidth={1} />;
@@ -225,35 +261,6 @@ function EventMarkerShape(props: {
   );
 }
 
-interface EventScatterDatum {
-  at: number;
-  balance: number;
-  event: EnergyEvent;
-}
-
-/** Recharts' `ComposedChart` inspects its own `props.children` by element
- * type (Line/Scatter/etc.) to build the chart's layers — it does this
- * statically, before rendering, so it only recognizes chart primitives that
- * are *direct* JSX children. A `<Scatter>` wrapped inside a custom
- * component (as this used to be) is invisible to that scan: the component
- * type in the children array is the wrapper, not `Scatter`, so recharts
- * silently drops the whole layer — no error, just nothing rendered. Kept as
- * a plain data-builder function instead of a component for that reason;
- * `<Scatter>` itself must stay inlined directly under `<ComposedChart>`. */
-function buildEventScatterData(events: EnergyEvent[], rows: ChartRow[]): EventScatterDatum[] {
-  return events.map((event) => {
-    const row = rowAtEvent(event, rows);
-    return {
-      // Use the matched row's (possibly deduped) `at` so the marker sits
-      // exactly on that row's line vertex, not the un-deduped original
-      // timestamp, which could now be a fraction of a millisecond off.
-      at: row?.at ?? new Date(event.at).getTime(),
-      balance: row?.actualBalance ?? row?.forecastBalance ?? 0,
-      event
-    };
-  });
-}
-
 function EventLegend(): JSX.Element {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary dark:text-ink-secondary-dark">
@@ -276,6 +283,38 @@ function EventLegend(): JSX.Element {
         Workout (planned)
       </li>
     </ul>
+  );
+}
+
+const SERIES_LABELS: Record<string, string> = {
+  actualBalance: "So far",
+  forecastBalance: "Forecast",
+  eventMarker: "Event"
+};
+
+/** Custom Tooltip content instead of the default `formatter`/`labelFormatter`
+ * combo: with all three series now sharing one row, most rows have `null`
+ * for two of the three fields (a row is either an actual-balance point, a
+ * forecast point, or an event marker), and the default renderer would list
+ * every series regardless, showing distracting "Forecast: —" / "Event: —"
+ * lines. Filters those out and only prints series with a real value. */
+function EnergyChartTooltip({ active, payload, label }: TooltipProps<number, string>): JSX.Element | null {
+  if (!active || !payload || payload.length === 0 || typeof label !== "number") {
+    return null;
+  }
+  const entries = payload.filter((entry) => entry.value !== null && entry.value !== undefined);
+  if (entries.length === 0) {
+    return null;
+  }
+  return (
+    <div className="rounded-md border border-line bg-white px-3 py-2 text-sm shadow-md dark:border-line-dark dark:bg-canvas-dark">
+      <p className="font-medium">{formatTimeMs(label)}</p>
+      {entries.map((entry) => (
+        <p key={entry.dataKey as string} style={{ color: entry.color }}>
+          {SERIES_LABELS[entry.dataKey as string] ?? entry.name}: {formatCalories(Number(entry.value))}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -345,27 +384,22 @@ export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartP
   const nowAt = energy.points[energy.points.length - 1]?.at ?? energy.forecastPoints[0]?.at ?? null;
   const nowAtMs = nowAt ? new Date(nowAt).getTime() : null;
   const rowTimes = rows.map((row) => row.at);
-  const domain: [number, number] | undefined =
+  const xDomain: [number, number] | undefined =
     rowTimes.length > 0 ? [Math.min(...rowTimes), Math.max(...rowTimes)] : undefined;
-  const ticks = domain ? computeHourTicks(domain[0], domain[1]) : undefined;
-  const eventData = buildEventScatterData(energy.events, rows);
+  const xTicks = xDomain ? computeHourTicks(xDomain[0], xDomain[1]) : undefined;
 
-  // recharts computes a shared axis's auto min/max from whichever series
-  // happen to feed it, and mixing a chart-level-`data` Line series with a
-  // separately-`data`-provided Scatter series (as here) makes that
-  // computation unreliable -- observed dropping the Line's true range in
-  // favor of just the Scatter's, clipping the line off the bottom/top of
-  // the plot instead of scaling to fit it. Computing the Y domain
-  // ourselves, from every value actually rendered, sidesteps that entirely
-  // rather than depending on recharts to get it right across mixed sources.
-  const yValues = [
-    ...rows.flatMap((row) => [row.actualBalance, row.forecastBalance].filter((v): v is number => v !== null)),
-    ...eventData.map((d) => d.balance)
-  ];
+  // recharts' auto min/max for a shared axis was unreliable across mixed
+  // data sources (see the `<Scatter>` comment above — now moot, since every
+  // series shares this one array), and even with one source, the default
+  // auto-scale doesn't round to clean numbers. Computing our own "nice"
+  // domain/ticks (mirroring computeHourTicks for the X axis) fixes both.
+  const yValues = rows.flatMap((row) =>
+    [row.actualBalance, row.forecastBalance, row.eventMarker].filter((v): v is number => v !== null)
+  );
   const yMin = yValues.length > 0 ? Math.min(...yValues) : 0;
   const yMax = yValues.length > 0 ? Math.max(...yValues) : 0;
   const yPadding = Math.max(10, (yMax - yMin) * 0.1);
-  const yDomain: [number, number] = [Math.floor(yMin - yPadding), Math.ceil(yMax + yPadding)];
+  const { domain: yDomain, ticks: yTicks } = computeYTicks(yMin - yPadding, yMax + yPadding);
 
   return (
     <div className="space-y-3">
@@ -375,21 +409,14 @@ export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartP
             <XAxis
               dataKey="at"
               type="number"
-              domain={domain ?? ["dataMin", "dataMax"]}
-              ticks={ticks}
+              domain={xDomain ?? ["dataMin", "dataMax"]}
+              ticks={xTicks}
               tickFormatter={formatTimeMs}
               tick={{ fontSize: 12 }}
             />
-            <YAxis domain={yDomain} tick={{ fontSize: 12 }} width={48} />
-            <ReferenceLine y={0} stroke="#d4d4d8" />
-            <Tooltip
-              labelFormatter={(label: number) => formatTimeMs(label)}
-              formatter={(value: number | string | Array<number | string>, name: string | number) =>
-                value === null || value === undefined
-                  ? ["—", name]
-                  : [formatCalories(Number(value)), name]
-              }
-            />
+            <YAxis domain={yDomain} ticks={yTicks} tick={{ fontSize: 12 }} width={48} />
+            <ReferenceLine y={0} stroke={ZERO_LINE_COLOR} />
+            <Tooltip content={<EnergyChartTooltip />} />
             {isToday && nowAtMs !== null ? (
               <ReferenceLine
                 x={nowAtMs}
@@ -424,8 +451,8 @@ export default function EnergyChart({ energy, isLoading, isToday }: EnergyChartP
               connectNulls={false}
               isAnimationActive={false}
             />
-            {eventData.length > 0 ? (
-              <Scatter name="Events" data={eventData} dataKey="balance" shape={EventMarkerShape} />
+            {energy.events.length > 0 ? (
+              <Scatter name="Events" dataKey="eventMarker" shape={EventMarkerShape} isAnimationActive={false} />
             ) : null}
           </ComposedChart>
         </ResponsiveContainer>

@@ -1,7 +1,49 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import EnergyChart from "./EnergyChart";
+import EnergyChart, { computeHourTicks, computeYTicks } from "./EnergyChart";
 import type { EnergyTimeline } from "../lib/api/types";
+
+describe("computeHourTicks", () => {
+  it("lands exactly on midnight through a ~24h domain, stepping every 4 hours", () => {
+    const midnight = new Date("2026-08-03T00:00:00Z").getTime();
+    const endOfDay = new Date("2026-08-03T23:59:00Z").getTime();
+
+    const ticks = computeHourTicks(midnight, endOfDay);
+
+    expect(ticks[0]).toBe(midnight);
+    for (let i = 1; i < ticks.length; i++) {
+      expect(ticks[i]! - ticks[i - 1]!).toBe(4 * 60 * 60 * 1000);
+    }
+    // None of the reported odd times (1:00, 5:00, 9:00, ...) should appear.
+    const hours = ticks.map((t) => new Date(t).getUTCHours());
+    expect(hours).toEqual(hours.map((h) => Math.round(h / 4) * 4));
+  });
+});
+
+describe("computeYTicks", () => {
+  it("snaps an arbitrary range to a round, evenly-spaced step", () => {
+    // The reported bad case: axis observed jumping 93, -402, -652, -902
+    // (uneven gaps) instead of a consistent round step.
+    const { ticks } = computeYTicks(-902, 93);
+
+    expect(ticks.length).toBeGreaterThan(1);
+    const step = ticks[1]! - ticks[0]!;
+    expect(step).toBeGreaterThan(0);
+    for (let i = 1; i < ticks.length; i++) {
+      expect(ticks[i]! - ticks[i - 1]!).toBe(step);
+    }
+    // A "nice" step is 1/2/5 times a power of ten.
+    const magnitude = 10 ** Math.floor(Math.log10(step));
+    expect([1, 2, 5, 10]).toContain(step / magnitude);
+  });
+
+  it("keeps the domain covering the requested range", () => {
+    const { domain } = computeYTicks(-137, 42);
+
+    expect(domain[0]).toBeLessThanOrEqual(-137);
+    expect(domain[1]).toBeGreaterThanOrEqual(42);
+  });
+});
 
 // recharts' ResponsiveContainer measures via getBoundingClientRect; jsdom
 // returns an all-zero rect by default, which makes it skip rendering the
@@ -65,7 +107,26 @@ describe("EnergyChart", () => {
     // no markers appeared on the chart at all despite the legend/summary
     // text below it looking correct. Assert against the actual rendered
     // marker shapes, not just presentational text.
+    //
+    // Event timestamps must match an actual points/forecastPoints entry —
+    // `<Scatter>` now reads from the same shared row array as the `<Line>`s
+    // (rather than its own separately-indexed data), which is what fixes
+    // the tooltip-snaps-to-the-wrong-point bug; an event with no matching
+    // row has nothing to attach a marker to, same as real API data (every
+    // event always has a corresponding point pair from compute_energy_timeline).
     const energy = makeEnergy({
+      points: [
+        { at: "2026-08-03T01:00:00Z", balance: 0 },
+        { at: "2026-08-03T08:00:00Z", balance: -350 },
+        { at: "2026-08-03T08:00:00Z", balance: 0 },
+        { at: "2026-08-03T11:00:00Z", balance: -280 },
+        { at: "2026-08-03T11:00:00Z", balance: -600 }
+      ],
+      forecastPoints: [
+        { at: "2026-08-03T11:00:00Z", balance: -600 },
+        { at: "2026-08-03T20:00:00Z", balance: -500 },
+        { at: "2026-08-03T20:00:00Z", balance: -900 }
+      ],
       events: [
         { at: "2026-08-03T08:00:00Z", deltaKcal: 350, kind: "meal", status: null },
         { at: "2026-08-03T11:00:00Z", deltaKcal: -320, kind: "workout", status: "completed" },
@@ -76,7 +137,9 @@ describe("EnergyChart", () => {
 
     const scatterLayer = container.querySelector(".recharts-scatter");
     expect(scatterLayer).not.toBeNull();
-    expect(scatterLayer?.querySelectorAll(".recharts-scatter-symbol")).toHaveLength(3);
+    // Real rendered marker shapes only -- not the empty `<g/>` fallback
+    // `<Scatter>` still emits (wrapped) for every other shared row.
+    expect(scatterLayer?.querySelectorAll("circle, polygon")).toHaveLength(3);
   });
 
   it("keeps the whole line within the plotted chart area, including a deep dip between sparse meals", () => {
