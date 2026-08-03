@@ -288,17 +288,31 @@ function EventLegend(): JSX.Element {
 
 const SERIES_LABELS: Record<string, string> = {
   actualBalance: "So far",
-  forecastBalance: "Forecast",
-  eventMarker: "Event"
+  forecastBalance: "Forecast"
 };
+
+/** Explicit sign even on a positive value (`+296`, not `296`) -- unlike the
+ * running-balance lines, an event's own figure is a delta, and a bare
+ * unsigned number reads ambiguously as "gained or spent?". A negative delta
+ * already carries its own "-" from `toLocaleString`, so nothing extra is
+ * added there. */
+function formatSignedCalories(value: number): string {
+  const rounded = Math.round(value);
+  return rounded > 0 ? `+${rounded.toLocaleString()}` : rounded.toLocaleString();
+}
 
 /** Custom Tooltip content instead of the default `formatter`/`labelFormatter`
  * combo: with all three series now sharing one row, most rows have `null`
  * for two of the three fields (a row is either an actual-balance point, a
  * forecast point, or an event marker), and the default renderer would list
  * every series regardless, showing distracting "Forecast: —" / "Event: —"
- * lines. Filters those out and only prints series with a real value. */
-function EnergyChartTooltip({ active, payload, label }: TooltipProps<number, string>): JSX.Element | null {
+ * lines. Filters those out and only prints series with a real value. The
+ * event row also gets special treatment: labeled by its kind ("Meal" /
+ * "Workout") rather than the generic series name, and shown as its own
+ * signed delta_kcal rather than the running balance it happens to sit at
+ * (which is already covered by the "So far"/"Forecast" line right above it).
+ */
+export function EnergyChartTooltip({ active, payload, label }: TooltipProps<number, string>): JSX.Element | null {
   if (!active || !payload || payload.length === 0 || typeof label !== "number") {
     return null;
   }
@@ -309,11 +323,26 @@ function EnergyChartTooltip({ active, payload, label }: TooltipProps<number, str
   return (
     <div className="rounded-md border border-line bg-white px-3 py-2 text-sm shadow-md dark:border-line-dark dark:bg-canvas-dark">
       <p className="font-medium">{formatTimeMs(label)}</p>
-      {entries.map((entry) => (
-        <p key={entry.dataKey as string} style={{ color: entry.color }}>
-          {SERIES_LABELS[entry.dataKey as string] ?? entry.name}: {formatCalories(Number(entry.value))}
-        </p>
-      ))}
+      {entries.map((entry) => {
+        const row = entry.payload as ChartRow | undefined;
+        if (entry.dataKey === "eventMarker") {
+          if (!row?.event) {
+            return null;
+          }
+          const kindLabel = row.event.kind === "meal" ? "Meal" : "Workout";
+          const color = row.event.kind === "meal" ? EVENT_MEAL_COLOR : EVENT_WORKOUT_COLOR;
+          return (
+            <p key="eventMarker" style={{ color }}>
+              {kindLabel} {formatSignedCalories(row.event.deltaKcal)}
+            </p>
+          );
+        }
+        return (
+          <p key={entry.dataKey} style={{ color: entry.color }}>
+            {SERIES_LABELS[entry.dataKey ?? ""] ?? entry.name}: {formatCalories(Number(entry.value))}
+          </p>
+        );
+      })}
     </div>
   );
 }

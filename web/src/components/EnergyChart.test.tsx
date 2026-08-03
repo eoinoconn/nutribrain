@@ -1,7 +1,52 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import EnergyChart, { computeHourTicks, computeYTicks } from "./EnergyChart";
-import type { EnergyTimeline } from "../lib/api/types";
+import EnergyChart, { EnergyChartTooltip, computeHourTicks, computeYTicks } from "./EnergyChart";
+import type { EnergyEvent, EnergyTimeline } from "../lib/api/types";
+
+describe("EnergyChartTooltip", () => {
+  const balanceEntry = {
+    dataKey: "actualBalance",
+    value: -104,
+    color: "#c2410c",
+    name: "So far",
+    payload: { at: 1000, originalAt: 1000, actualBalance: -104, forecastBalance: null, eventMarker: null, event: null }
+  };
+
+  function eventEntry(event: EnergyEvent) {
+    return {
+      dataKey: "eventMarker",
+      value: -104,
+      color: "#0284c7",
+      name: "Events",
+      payload: { at: 1000, originalAt: 1000, actualBalance: null, forecastBalance: null, eventMarker: -104, event }
+    };
+  }
+
+  it("labels a meal event by kind with its signed delta, not the raw series name", () => {
+    const meal: EnergyEvent = { at: "2026-08-03T08:00:00Z", deltaKcal: 296, kind: "meal", status: null };
+    render(
+      <EnergyChartTooltip active={true} label={1000} payload={[balanceEntry, eventEntry(meal)] as never} />
+    );
+
+    expect(screen.getByText(/^So far: -104$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Meal \+296$/)).toBeInTheDocument();
+  });
+
+  it("labels a workout event by kind with its signed (negative) delta", () => {
+    const workout: EnergyEvent = { at: "2026-08-03T11:00:00Z", deltaKcal: -700, kind: "workout", status: "completed" };
+    render(
+      <EnergyChartTooltip active={true} label={1000} payload={[balanceEntry, eventEntry(workout)] as never} />
+    );
+
+    expect(screen.getByText(/^So far: -104$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Workout -700$/)).toBeInTheDocument();
+  });
+
+  it("renders nothing when not active", () => {
+    const { container } = render(<EnergyChartTooltip active={false} label={1000} payload={[balanceEntry] as never} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
 
 describe("computeHourTicks", () => {
   it("lands exactly on midnight through a ~24h domain, stepping every 4 hours", () => {
