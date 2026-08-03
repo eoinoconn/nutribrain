@@ -45,7 +45,8 @@ describe("App", () => {
       },
       effectiveTarget: null,
       deltaVsTarget: null,
-      energy: null
+      energy: null,
+      workouts: []
     });
   });
 

@@ -101,6 +101,20 @@ class EnergyTimelineSchema(BaseModel):
     fueling_flags: list[FuelingFlagSchema]
 
 
+class PlannedWorkoutSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    external_id: str | None = None
+    source: str
+    start_at: datetime
+    duration_minutes: int
+    sport_type: str | None = None
+    estimated_calories: int | None = None
+    actual_calories: int | None = None
+    status: str
+
+
 class DayResponseSchema(BaseModel):
     date: date
     meals: dict[str, list[DayMealGroupSchema]]
@@ -108,6 +122,7 @@ class DayResponseSchema(BaseModel):
     effective_target: EffectiveTargetSchema | None = None
     delta_vs_target: ItemMacrosSchema | None = None
     energy: EnergyTimelineSchema | None = None
+    workouts: list[PlannedWorkoutSchema] = []
 
 
 class PeriodTotalsSchema(BaseModel):
@@ -182,6 +197,9 @@ def read_day(
             if result.energy is not None
             else None
         ),
+        workouts=[
+            PlannedWorkoutSchema.model_validate(w, from_attributes=True) for w in result.workouts
+        ],
     )
 
 

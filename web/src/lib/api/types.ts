@@ -218,6 +218,18 @@ export interface EnergyTimeline {
   fuelingFlags: FuelingFlag[];
 }
 
+export interface PlannedWorkout {
+  id: number;
+  externalId: string | null;
+  source: string;
+  startAt: string;
+  durationMinutes: number;
+  sportType: string | null;
+  estimatedCalories: number | null;
+  actualCalories: number | null;
+  status: string;
+}
+
 export interface DayResponse {
   date: string;
   meals: Record<string, DayMealGroup[]>;
@@ -225,6 +237,7 @@ export interface DayResponse {
   effectiveTarget: EffectiveTarget | null;
   deltaVsTarget: ItemMacros | null;
   energy: EnergyTimeline | null;
+  workouts: PlannedWorkout[];
 }
 
 export interface PeriodTotals {

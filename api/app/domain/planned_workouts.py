@@ -125,6 +125,38 @@ def create_manual_planned_workout(
     )
 
 
+def _to_dto(workout: PlannedWorkout) -> PlannedWorkoutDTO:
+    return PlannedWorkoutDTO(
+        id=workout.id,
+        external_id=workout.external_id,
+        source=workout.source,
+        local_date=workout.local_date,
+        start_at=workout.start_at,
+        duration_minutes=workout.duration_minutes,
+        sport_type=workout.sport_type,
+        icu_joules=workout.icu_joules,
+        estimated_calories=workout.estimated_calories,
+        actual_calories=workout.actual_calories,
+        status=workout.status,
+        fetched_at=workout.fetched_at,
+    )
+
+
+def list_planned_workouts_for_day(session: Session, *, day: date) -> list[PlannedWorkoutDTO]:
+    """List every planned_workouts row (any source/status) for one local day.
+
+    Ordered by start_at so a caller (e.g. get_day, EC-04's list-alongside-
+    meals surface) can render them chronologically without re-sorting.
+    """
+
+    workouts = session.scalars(
+        select(PlannedWorkout)
+        .where(PlannedWorkout.local_date == day)
+        .order_by(PlannedWorkout.start_at)
+    )
+    return [_to_dto(workout) for workout in workouts]
+
+
 # --- EC-03: sync-side mapping + upsert (§6 "Sync changes") -----------------
 #
 # KCAL_PER_KILOJOULE / estimate_workout_calories now live in

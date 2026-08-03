@@ -26,6 +26,7 @@ from app.domain.dto import (
 from app.domain.energy_balance import compute_energy_timeline
 from app.domain.errors import NoTargetSetError
 from app.domain.nutrition_math import compute_item_macros
+from app.domain.planned_workouts import list_planned_workouts_for_day
 from app.domain.targets import get_effective_target, resolve_calories_out_map
 
 
@@ -54,8 +55,9 @@ def get_day(session: Session, *, day: date, now: datetime | None = None) -> DayR
 
     Returns:
         DayResponse with meals grouped by meal_type, day totals, effective
-        target, delta vs. target, and the energy timeline (or None if no
-        target is set for the day).
+        target, delta vs. target, the energy timeline (or None if no target
+        is set for the day), and every planned_workouts row for the day
+        (any source/status) for display alongside the meal list.
     """
 
     resolved_now = now or datetime.now(UTC)
@@ -105,6 +107,8 @@ def get_day(session: Session, *, day: date, now: datetime | None = None) -> DayR
     except NoTargetSetError:
         energy = None
 
+    workouts = list_planned_workouts_for_day(session, day=day)
+
     return DayResponse(
         date=day,
         meals=grouped,
@@ -112,6 +116,7 @@ def get_day(session: Session, *, day: date, now: datetime | None = None) -> DayR
         effective_target=effective_target,
         delta_vs_target=delta,
         energy=energy,
+        workouts=workouts,
     )
 
 

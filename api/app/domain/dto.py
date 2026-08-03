@@ -200,6 +200,7 @@ class DayResponse:
     effective_target: EffectiveTarget | None
     delta_vs_target: ItemMacros | None
     energy: EnergyTimeline | None
+    workouts: list[PlannedWorkoutDTO]
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,7 +14,7 @@ import {
   setManualCaloriesOut,
   syncIntervals
 } from "../lib/api/client";
-import type { DayResponse, MealItem } from "../lib/api/types";
+import type { DayResponse, MealItem, PlannedWorkout } from "../lib/api/types";
 
 vi.mock("../lib/api/client", () => ({
   getDay: vi.fn(),
@@ -79,6 +79,7 @@ function makeDay(overrides: Partial<DayResponse> = {}): DayResponse {
     effectiveTarget: null,
     deltaVsTarget: null,
     energy: null,
+    workouts: [],
     ...overrides
   };
 }
@@ -278,6 +279,75 @@ describe("DayView", () => {
       await screen.findByText("no meals logged this day");
       expect(screen.getByRole("heading", { name: /energy balance/i })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: /live energy/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("workouts list", () => {
+    function makeWorkout(overrides: Partial<PlannedWorkout> = {}): PlannedWorkout {
+      return {
+        id: 1,
+        externalId: null,
+        source: "manual",
+        startAt: "2026-07-20T11:19:36Z",
+        durationMinutes: 60,
+        sportType: "Ride",
+        estimatedCalories: null,
+        actualCalories: 466,
+        status: "completed",
+        ...overrides
+      };
+    }
+
+    it("renders a workout's name and calories burned", async () => {
+      mockedGetDay.mockResolvedValue(makeDay({ workouts: [makeWorkout()] }));
+      renderPage("/day/2026-07-20");
+
+      expect(await screen.findByRole("heading", { name: /workouts/i })).toBeInTheDocument();
+      expect(screen.getByText("Ride")).toBeInTheDocument();
+      expect(screen.getByText("466 cal")).toBeInTheDocument();
+    });
+
+    it("falls back to a generic name when sportType is null (a manual entry)", async () => {
+      mockedGetDay.mockResolvedValue(
+        makeDay({ workouts: [makeWorkout({ sportType: null, status: "planned", estimatedCalories: 400, actualCalories: null })] })
+      );
+      renderPage("/day/2026-07-20");
+
+      expect(await screen.findByText("Workout")).toBeInTheDocument();
+      expect(screen.getByText("400 cal")).toBeInTheDocument();
+    });
+
+    it("links a completed workout with an external_id to intervals.icu", async () => {
+      mockedGetDay.mockResolvedValue(
+        makeDay({ workouts: [makeWorkout({ externalId: "i171997240", status: "completed" })] })
+      );
+      renderPage("/day/2026-07-20");
+
+      const link = await screen.findByRole("link", { name: /view on intervals\.icu/i });
+      expect(link).toHaveAttribute("href", "https://intervals.icu/activities/i171997240");
+    });
+
+    it("does not link a planned workout, or a completed one with no external_id (a manual entry)", async () => {
+      mockedGetDay.mockResolvedValue(
+        makeDay({
+          workouts: [
+            makeWorkout({ id: 1, status: "planned", externalId: null }),
+            makeWorkout({ id: 2, status: "completed", externalId: null })
+          ]
+        })
+      );
+      renderPage("/day/2026-07-20");
+
+      await screen.findByRole("heading", { name: /workouts/i });
+      expect(screen.queryByRole("link", { name: /view on intervals\.icu/i })).not.toBeInTheDocument();
+    });
+
+    it("does not render a Workouts section when there are none", async () => {
+      mockedGetDay.mockResolvedValue(makeDay({ workouts: [] }));
+      renderPage("/day/2026-07-20");
+
+      await screen.findByText("no meals logged this day");
+      expect(screen.queryByRole("heading", { name: /workouts/i })).not.toBeInTheDocument();
     });
   });
 
