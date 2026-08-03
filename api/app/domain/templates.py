@@ -324,24 +324,25 @@ def _spec_to_template_item(
 
 
 def _resolve_item_name(session: Session, *, food_id: int | None, name: str | None) -> str:
-    """Fill in a template item's name when omitted (§MCP-09).
+    """Resolve a template item's stored name (§MCP-09).
 
-    An explicit name is always honored as-is (template item names have always
-    been stored verbatim, independent of the referenced food's own name). When
-    omitted and food_id is set, falls back to that food's current name.
-    Ad-hoc items (food_id None) have no other source of a name, so an omitted
-    name there is a domain error rather than a NOT NULL constraint failure.
+    Food-linked items (food_id set) always use the referenced food's current
+    name, matching log_meal's behavior — an explicit name is ignored rather
+    than stored, so a stale caller-supplied name can never drift from the
+    food's canonical one. Ad-hoc items (food_id None) have no other source of
+    a name: an explicit name is required, and omitting it is a domain error
+    rather than a NOT NULL constraint failure.
     """
-
-    normalized = (name or "").strip()
-    if normalized:
-        return normalized
 
     if food_id is not None:
         food = session.get(Food, food_id)
         if food is None:
             raise FoodNotFoundError(f"id:{food_id}")
         return food.name
+
+    normalized = (name or "").strip()
+    if normalized:
+        return normalized
 
     raise AdhocItemNameRequiredError()
 

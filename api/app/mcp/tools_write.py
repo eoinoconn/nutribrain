@@ -220,11 +220,12 @@ def register_write_tools(mcp: FastMCP) -> None:
         description=(
             "Copy an already-logged meal's items into a new meal, e.g. 'same as "
             "yesterday'. Food-linked items keep computing macros live (no snapshot); "
-            "ad-hoc items copy their stored macro snapshot. meal_type carries forward "
-            "from the source meal. notes are NOT copied — pass notes explicitly if the "
-            "new meal needs one, otherwise it starts blank. to_day defaults to today; "
-            "at defaults to the source meal's own time-of-day. Cheaper than get_day + "
-            "parse + log_meal for repeating a meal."
+            "ad-hoc items copy their stored macro snapshot. meal_type is re-inferred "
+            "from the new logged_at/local_tz (same time-window inference as log_meal) "
+            "unless passed explicitly. notes are NOT copied — pass notes explicitly if "
+            "the new meal needs one, otherwise it starts blank. to_day defaults to "
+            "today; at defaults to the source meal's own time-of-day. Cheaper than "
+            "get_day + parse + log_meal for repeating a meal."
         ),
     )
     def copy_meal_tool(
@@ -232,6 +233,7 @@ def register_write_tools(mcp: FastMCP) -> None:
         local_tz: str,
         to_day: str | date | None = None,
         at: time | None = None,
+        meal_type: MealType | None = None,
         quantity_scale: NumericDecimal | None = None,
         notes: str | None = None,
     ) -> CopyMealResult:
@@ -243,6 +245,7 @@ def register_write_tools(mcp: FastMCP) -> None:
                     meal_id=meal_id,
                     local_tz=local_tz,
                     to_day=to_day,
+                    meal_type=meal_type,
                     at=at,
                     quantity_scale=quantity_scale,
                     notes=notes,

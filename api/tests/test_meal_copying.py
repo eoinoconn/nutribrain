@@ -2,7 +2,8 @@
 
 Covers the materialization contract (food-linked items stay live-computed,
 ad-hoc items copy their macro snapshot), quantity_scale, to_day/at resolution,
-meal_type carry-forward, notes defaulting, and the not-found error.
+meal_type re-inference (and explicit override), notes defaulting, and the
+not-found error.
 """
 
 from __future__ import annotations
@@ -185,7 +186,7 @@ class TestCopyMealDayAndTime:
 
 
 class TestCopyMealMetaFields:
-    def test_meal_type_carries_forward_from_source(
+    def test_meal_type_reinfers_from_new_time_when_omitted(
         self, db_session: Session, make_food, make_meal, make_meal_item
     ) -> None:
         food = make_food()
@@ -195,11 +196,26 @@ class TestCopyMealMetaFields:
         )
         make_meal_item(meal=meal, food=food)
 
-        # The resolved copy time would infer as "dinner" if meal_type were
-        # re-inferred; it must carry forward from the source instead.
+        # `at` is omitted, so the source's 20:00 time-of-day is reused; that
+        # falls in the dinner window (16:00-21:59), so an omitted meal_type
+        # is re-inferred as dinner rather than carrying "breakfast" forward.
         result = copy_meal(db_session, meal_id=meal.id, local_tz="UTC")
 
-        assert result.meal_type == MealType.breakfast
+        assert result.meal_type == MealType.dinner
+
+    def test_meal_type_explicit_override_is_honored(
+        self, db_session: Session, make_food, make_meal, make_meal_item
+    ) -> None:
+        food = make_food()
+        meal = make_meal(
+            meal_type=MealType.breakfast,
+            logged_at=datetime(2026, 7, 26, 20, 0, tzinfo=UTC),
+        )
+        make_meal_item(meal=meal, food=food)
+
+        result = copy_meal(db_session, meal_id=meal.id, local_tz="UTC", meal_type=MealType.snack)
+
+        assert result.meal_type == MealType.snack
 
     def test_notes_default_to_empty_when_omitted(
         self, db_session: Session, make_food, make_meal, make_meal_item

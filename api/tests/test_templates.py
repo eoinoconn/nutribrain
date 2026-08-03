@@ -145,15 +145,13 @@ class TestCreateTemplate:
         assert len(result.items) == 1
         assert result.items[0].name == sample_food.name
 
-    def test_create_food_linked_item_explicit_name_still_works(
+    def test_create_food_linked_item_explicit_name_is_ignored(
         self, db_session: Session, sample_food: Food
     ) -> None:
-        """MCP-09: an explicit name on a food-linked template item is honored as-is.
-
-        Unlike log_meal (which always overrides a food-linked item's name with
-        the food's current name), template items have always stored the
-        caller-supplied name verbatim. This test confirms that pre-existing
-        behavior is preserved for this change.
+        """MCP-09 (follow-up): an explicit name on a food-linked template item is
+        ignored in favor of the food's current name, matching log_meal's
+        behavior — the food's name is canonical everywhere a food_id is set,
+        so a stale caller-supplied name can never drift from it.
         """
 
         result = create_template(
@@ -170,7 +168,7 @@ class TestCreateTemplate:
         )
 
         assert len(result.items) == 1
-        assert result.items[0].name == "My Oats"
+        assert result.items[0].name == sample_food.name
 
     def test_create_adhoc_item_name_omitted_raises(self, db_session: Session) -> None:
         """MCP-09: an ad-hoc item (no food_id) with no name raises a clear domain error."""

@@ -28,10 +28,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.db import Food, IntervalsCaloriesOut, Meal, MealItem, Target
+from app.db import Food, IntervalsCaloriesOut, Meal, MealItem, MealType, Target
 from app.domain.dto import ItemMacros, MealItemResponse, MealResponse
 from app.domain.errors import MealNotFoundError
-from app.domain.meal_timing import parse_local_date
+from app.domain.meal_timing import parse_local_date, resolve_meal_type
 from app.domain.nutrition_math import compute_item_macros
 from app.logging import get_logger
 
@@ -45,6 +45,7 @@ def copy_meal(
     local_tz: str,
     to_day: str | date | None = None,
     at: time | None = None,
+    meal_type: MealType | None = None,
     quantity_scale: Decimal | None = None,
     notes: str | None = None,
     now: datetime | None = None,
@@ -63,9 +64,11 @@ def copy_meal(
     local time-of-day is reused (so a copy defaults to "same time, different
     day" rather than "right now"), converted into ``local_tz``'s wall clock.
 
-    ``meal_type`` carries forward from the source meal unchanged — a copied
-    breakfast should stay tagged breakfast even if the copied time-of-day
-    shifts slightly. It is not re-inferred from the new time.
+    ``meal_type`` is re-inferred from the new ``logged_at``/``local_tz`` (the
+    same time-window inference ``log_meal`` uses) when omitted, rather than
+    carried forward from the source meal — a breakfast copied to 19:00
+    becomes a dinner, matching what a fresh ``log_meal`` call at that time
+    would infer. Pass ``meal_type`` explicitly to override the inference.
 
     ``notes`` is NOT copied from the source meal: a copied meal is a new
     event, and yesterday's specific note (e.g. "big appetite today") should
@@ -89,13 +92,15 @@ def copy_meal(
     local_dt = datetime.combine(local_day, local_time, tzinfo=ZoneInfo(local_tz))
     logged_at = local_dt.astimezone(UTC)
 
+    resolved_meal_type = resolve_meal_type(meal_type, logged_at, local_tz)
+
     scale = quantity_scale if quantity_scale is not None else Decimal("1")
 
     meal = Meal(
         logged_at=logged_at,
         local_tz=local_tz,
         local_date=local_day,
-        meal_type=source.meal_type,
+        meal_type=resolved_meal_type,
         notes=notes,
     )
     session.add(meal)
