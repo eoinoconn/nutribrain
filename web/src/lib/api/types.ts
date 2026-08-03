@@ -218,16 +218,19 @@ export interface EnergyTimeline {
   fuelingFlags: FuelingFlag[];
 }
 
+export type PlannedWorkoutSource = "intervals_planned" | "intervals_completed" | "manual";
+export type PlannedWorkoutStatus = "planned" | "completed";
+
 export interface PlannedWorkout {
   id: number;
   externalId: string | null;
-  source: string;
+  source: PlannedWorkoutSource;
   startAt: string;
   durationMinutes: number;
   sportType: string | null;
   estimatedCalories: number | null;
   actualCalories: number | null;
-  status: string;
+  status: PlannedWorkoutStatus;
 }
 
 export interface DayResponse {

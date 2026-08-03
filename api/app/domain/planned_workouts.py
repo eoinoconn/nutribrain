@@ -505,16 +505,17 @@ def _parse_local_datetime(value: str, *, local_timezone: str) -> tuple[date, dat
 
     Unlike ``start_at`` on a manual row (a caller-supplied instant later
     converted *into* the account timezone to derive ``local_date``),
-    intervals.icu's ``start_date_local`` is already local wall-clock time
-    with no UTC offset (confirmed by reading
-    ``client._extract_activity_day``, which treats the same field as a bare
-    local date via ``date.fromisoformat(value[:10])``). There's no existing
-    "attach a timezone to a naive intervals timestamp" convention elsewhere
-    in this codebase to follow, so this attaches the account's configured
-    local timezone (``app/domain/settings.py``) to the naive value to
-    produce a tz-aware instant for the ``start_at`` column, while
-    ``local_date`` is taken directly from the string's date component (no
-    tz conversion needed since it's already local).
+    intervals.icu's ``start_date_local`` is documented (intervals.icu's
+    OpenAPI spec) and assumed here to already be local wall-clock time with
+    no UTC offset. ``app/intervals/client.py`` requires this field to be
+    present on every activity/event row precisely so that assumption holds;
+    it does not fall back to an offset-bearing field like ``start_date``.
+    There's no existing "attach a timezone to a naive intervals timestamp"
+    convention elsewhere in this codebase to follow, so this attaches the
+    account's configured local timezone (``app/domain/settings.py``) to the
+    naive value to produce a tz-aware instant for the ``start_at`` column,
+    while ``local_date`` is taken directly from the string's date component
+    (no tz conversion needed since it's already local).
     """
 
     local_date = date.fromisoformat(value[:10])

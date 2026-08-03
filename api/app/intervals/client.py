@@ -210,9 +210,9 @@ def _parse_activities_detailed_payload(payload: Any) -> list[ActivityDetail]:
         if not isinstance(activity, dict):
             raise ValueError("activity row must be an object")
 
-        start_date_like = _first_present(activity, "start_date_local", "start_date", "date")
-        if not isinstance(start_date_like, str):
-            raise ValueError("activity row is missing start date")
+        start_date_local = activity.get("start_date_local")
+        if not isinstance(start_date_local, str):
+            raise ValueError("activity row is missing start_date_local")
 
         external_id = _extract_external_id(activity)
         duration_minutes = _extract_duration_minutes(activity)
@@ -223,7 +223,7 @@ def _parse_activities_detailed_payload(payload: Any) -> list[ActivityDetail]:
         details.append(
             ActivityDetail(
                 external_id=external_id,
-                start_date_local=start_date_like,
+                start_date_local=start_date_local,
                 duration_minutes=duration_minutes,
                 sport_type=sport_type,
                 calories=calories,
@@ -245,9 +245,9 @@ def _parse_planned_events_payload(payload: Any) -> list[PlannedEventDetail]:
         if not isinstance(event, dict):
             raise ValueError("event row must be an object")
 
-        start_date_like = _first_present(event, "start_date_local", "start_date", "date")
-        if not isinstance(start_date_like, str):
-            raise ValueError("event row is missing start date")
+        start_date_local = event.get("start_date_local")
+        if not isinstance(start_date_local, str):
+            raise ValueError("event row is missing start_date_local")
 
         external_id = _extract_external_id(event)
         duration_minutes = _extract_duration_minutes(event)
@@ -257,7 +257,7 @@ def _parse_planned_events_payload(payload: Any) -> list[PlannedEventDetail]:
         details.append(
             PlannedEventDetail(
                 external_id=external_id,
-                start_date_local=start_date_like,
+                start_date_local=start_date_local,
                 duration_minutes=duration_minutes,
                 sport_type=sport_type,
                 icu_joules=icu_joules,
