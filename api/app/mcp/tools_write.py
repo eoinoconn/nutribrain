@@ -6,84 +6,136 @@ history rewrites and other irreversible mistakes.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from typing import cast
+from typing import Annotated, cast
 
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, WithJsonSchema
 
 from app.api.foods import FoodResponse
-from app.db import QuantityUnit, ServingUnit
+from app.db import MealType, QuantityUnit, ServingUnit
 from app.domain import (
     MealItemSpec,
     TemplateItemSpec,
     add_food,
+    copy_meal,
     create_template,
+    delete_food,
     delete_meal,
     delete_meal_item,
     delete_template,
     log_meal,
     log_template,
+    merge_food,
     set_favorite_food,
     set_target,
     update_food,
+    update_meal,
+    update_meal_item,
     update_template,
 )
-from app.domain.dto import MealResponse, TemplateResponse
+from app.domain.dto import MealItemResponse, MealResponse, TemplateResponse
 from app.domain.dto import SetTargetResult as SetTargetDto
 from app.domain.errors import DomainError
 from app.domain.foods import AddFoodResult as AddFoodDomainResult
+from app.domain.foods import MergeFoodResult as MergeFoodDomainResult
 from app.domain.foods import UpdateFoodResult as UpdateFoodDomainResult
 from app.mcp._tool_common import capture_domain_error, run_with_session
-from app.mcp.date_args import resolve_date_arg
+from app.mcp.date_args import resolve_date_arg, resolve_effective_local_tz
 from app.mcp.serializers import (
     DeleteResultModel,
+    MealItemModel,
     MealModel,
     SetTargetResultModel,
     TemplateModel,
     ToolErrorResponse,
     serialize_meal,
+    serialize_meal_item,
     serialize_set_target_result,
     serialize_template,
 )
 
+# Pydantic's default JSON Schema for Decimal is `anyOf: [{type: number}, {type:
+# string, pattern: ...}]` (~60-70 tokens per field), because Decimal accepts
+# both numeric and string input at the *runtime* validation layer. That
+# runtime acceptance (numeric strings, ints, floats, Decimals) is unchanged
+# here and still fully supported for precision-sensitive callers — this alias
+# only overrides what's *advertised* in the tool schema, collapsing it to a
+# plain `{"type": "number"}` (~10 tokens) since MCP transport is JSON and
+# schema consumers only need to know "send a number".
+NumericDecimal = Annotated[Decimal, WithJsonSchema({"type": "number"})]
+
 
 class MealItemInput(BaseModel):
-    name: str = Field(min_length=1)
-    quantity: Decimal
+    # Optional when food_id is set: the domain layer fills it in from the
+    # resolved food's current name. Required when food_id is None (ad-hoc
+    # items have no other source of a name) — the domain layer raises a
+    # clear error if both are omitted.
+    name: str | None = Field(default=None, min_length=1)
+    quantity: NumericDecimal
     quantity_unit: QuantityUnit
     food_id: int | None = None
-    calories: Decimal | None = None
-    protein_g: Decimal | None = None
-    carbs_g: Decimal | None = None
-    fat_g: Decimal | None = None
-    fiber_g: Decimal | None = None
-    sat_fat_g: Decimal | None = None
-    sodium_mg: Decimal | None = None
+    calories: NumericDecimal | None = None
+    protein_g: NumericDecimal | None = None
+    carbs_g: NumericDecimal | None = None
+    fat_g: NumericDecimal | None = None
+    fiber_g: NumericDecimal | None = None
+    sat_fat_g: NumericDecimal | None = None
+    sodium_mg: NumericDecimal | None = None
 
 
 class TemplateItemInput(BaseModel):
-    name: str = Field(min_length=1)
-    quantity: Decimal
+    # Optional when food_id is set: the domain layer fills it in from the
+    # referenced food's current name. Required when food_id is None (ad-hoc
+    # items have no other source of a name) — the domain layer raises a
+    # clear error if both are omitted.
+    name: str | None = Field(default=None, min_length=1)
+    quantity: NumericDecimal
     quantity_unit: QuantityUnit
     food_id: int | None = None
-    calories: Decimal | None = None
-    protein_g: Decimal | None = None
-    carbs_g: Decimal | None = None
-    fat_g: Decimal | None = None
-    fiber_g: Decimal | None = None
-    sat_fat_g: Decimal | None = None
-    sodium_mg: Decimal | None = None
+    calories: NumericDecimal | None = None
+    protein_g: NumericDecimal | None = None
+    carbs_g: NumericDecimal | None = None
+    fat_g: NumericDecimal | None = None
+    fiber_g: NumericDecimal | None = None
+    sat_fat_g: NumericDecimal | None = None
+    sodium_mg: NumericDecimal | None = None
 
 
 type LogMealResult = MealModel | ToolErrorResponse
 type LogTemplateResult = MealModel | ToolErrorResponse
 type AddFoodResult = FoodResponse | ToolErrorResponse
 type UpdateFoodResult = dict[str, object] | ToolErrorResponse
+type DeleteFoodResult = FoodResponse | ToolErrorResponse
+type MergeFoodResult = dict[str, object] | ToolErrorResponse
 type TemplateResult = TemplateModel | ToolErrorResponse
 type SetTargetResult = SetTargetResultModel | ToolErrorResponse
 type DeleteResult = DeleteResultModel | ToolErrorResponse
+type UpdateMealResult = MealModel | ToolErrorResponse
+type UpdateMealItemResult = MealItemModel | ToolErrorResponse
+type CopyMealResult = MealModel | ToolErrorResponse
+
+# Sentinel default for update_meal_item_tool's food_id: unlike a plain `= None`
+# default, this survives being unset by the MCP call (pydantic's argument
+# validation only substitutes the Python default for a truly omitted key, and
+# does not run that default value through validation, so this sentinel object
+# passes straight through when the caller doesn't mention food_id at all).
+# That distinction matters here specifically because None is a meaningful,
+# consequential value for food_id (it converts the item to ad-hoc) — losing
+# "omitted" vs "explicitly null" would make quantity-only edits on food-linked
+# items spuriously demand macros. Plain `= None` (as used for the other
+# optional fields below, mirroring update_food) is fine where the field is
+# just cosmetic/optional and "leave alone" vs "clear" is low-stakes.
+_FOOD_ID_UNSET: object = object()
+
+# Same rationale as _FOOD_ID_UNSET, applied to update_meal_tool's notes: the
+# domain function's notes parameter uses the "explicit clear" sentinel
+# pattern (omit -> unchanged, pass None -> clear), so a plain `= None`
+# default here would forward notes=None on every call that simply omits
+# notes, silently wiping existing notes on unrelated single-field edits
+# (e.g. a meal_type-only correction).
+_NOTES_UNSET: object = object()
 
 
 def register_write_tools(mcp: FastMCP) -> None:
@@ -92,26 +144,31 @@ def register_write_tools(mcp: FastMCP) -> None:
         description=(
             "Log one meal with one or more items. Use this for normal meal logging; "
             "do not use update_food to fix a single meal because update_food rewrites "
-            "historical totals for every meal using that food."
+            "historical totals for every meal using that food. local_tz defaults to "
+            "the server's configured timezone when omitted. logged_at defaults to now; "
+            "if given naive (no offset/Z), it is interpreted in the effective local "
+            "timezone (explicit local_tz or the server default); if given with an "
+            "explicit offset, it is used as-is."
         ),
     )
     def log_meal_tool(
         items: list[MealItemInput],
-        local_tz: str,
+        local_tz: str | None = None,
         logged_at: datetime | None = None,
-        meal_type: str | None = None,
+        meal_type: MealType | None = None,
         notes: str | None = None,
     ) -> LogMealResult:
-        when = logged_at or datetime.now(UTC)
         specs = [MealItemSpec(**item.model_dump()) for item in items]
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            when = logged_at or datetime.now(UTC)
             meal = cast(
                 MealResponse,
                 run_with_session(
                     log_meal,
                     items=specs,
                     logged_at=when,
-                    local_tz=local_tz,
+                    local_tz=tz,
                     meal_type=meal_type,
                     notes=notes,
                 ),
@@ -125,27 +182,71 @@ def register_write_tools(mcp: FastMCP) -> None:
         description=(
             "Log a previously created template into a meal. Templates are user-initiated "
             "shortcuts and should only be used when the user explicitly wants a repeatable "
-            "meal pattern."
+            "meal pattern. local_tz defaults to the server's configured timezone when "
+            "omitted. logged_at defaults to now; if given naive (no offset/Z), it is "
+            "interpreted in the effective local timezone (explicit local_tz or the "
+            "server default); if given with an explicit offset, it is used as-is."
         ),
     )
     def log_template_tool(
         template_id: int,
-        local_tz: str,
+        local_tz: str | None = None,
         logged_at: datetime | None = None,
-        meal_type: str | None = None,
-        quantity_scale: Decimal = Decimal("1"),
+        meal_type: MealType | None = None,
+        quantity_scale: NumericDecimal = Decimal("1"),
         notes: str | None = None,
     ) -> LogTemplateResult:
-        when = logged_at or datetime.now(UTC)
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            when = logged_at or datetime.now(UTC)
             meal = cast(
                 MealResponse,
                 run_with_session(
                     log_template,
                     template_id=template_id,
                     logged_at=when,
-                    local_tz=local_tz,
+                    local_tz=tz,
                     meal_type=meal_type,
+                    quantity_scale=quantity_scale,
+                    notes=notes,
+                ),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_meal(meal)
+
+    @mcp.tool(
+        name="copy_meal",
+        description=(
+            "Copy an already-logged meal's items into a new meal, e.g. 'same as "
+            "yesterday'. Food-linked items keep computing macros live (no snapshot); "
+            "ad-hoc items copy their stored macro snapshot. meal_type is re-inferred "
+            "from the new logged_at/local_tz (same time-window inference as log_meal) "
+            "unless passed explicitly. notes are NOT copied — pass notes explicitly if "
+            "the new meal needs one, otherwise it starts blank. to_day defaults to "
+            "today; at defaults to the source meal's own time-of-day. Cheaper than "
+            "get_day + parse + log_meal for repeating a meal."
+        ),
+    )
+    def copy_meal_tool(
+        meal_id: int,
+        local_tz: str,
+        to_day: str | date | None = None,
+        at: time | None = None,
+        meal_type: MealType | None = None,
+        quantity_scale: NumericDecimal | None = None,
+        notes: str | None = None,
+    ) -> CopyMealResult:
+        try:
+            meal = cast(
+                MealResponse,
+                run_with_session(
+                    copy_meal,
+                    meal_id=meal_id,
+                    local_tz=local_tz,
+                    to_day=to_day,
+                    meal_type=meal_type,
+                    at=at,
                     quantity_scale=quantity_scale,
                     notes=notes,
                 ),
@@ -164,16 +265,16 @@ def register_write_tools(mcp: FastMCP) -> None:
     )
     def add_food_tool(
         name: str,
-        serving_size: Decimal,
+        serving_size: NumericDecimal,
         serving_unit: ServingUnit,
-        calories: Decimal,
-        protein_g: Decimal,
-        carbs_g: Decimal,
-        fat_g: Decimal,
-        fiber_g: Decimal | None = None,
-        sat_fat_g: Decimal | None = None,
-        sodium_mg: Decimal | None = None,
-        density_g_per_ml: Decimal | None = None,
+        calories: NumericDecimal,
+        protein_g: NumericDecimal,
+        carbs_g: NumericDecimal,
+        fat_g: NumericDecimal,
+        fiber_g: NumericDecimal | None = None,
+        sat_fat_g: NumericDecimal | None = None,
+        sodium_mg: NumericDecimal | None = None,
+        density_g_per_ml: NumericDecimal | None = None,
         force: bool = False,
     ) -> AddFoodResult:
         try:
@@ -209,16 +310,16 @@ def register_write_tools(mcp: FastMCP) -> None:
     def update_food_tool(
         food_id: int,
         name: str | None = None,
-        serving_size: Decimal | None = None,
+        serving_size: NumericDecimal | None = None,
         serving_unit: ServingUnit | None = None,
-        calories: Decimal | None = None,
-        protein_g: Decimal | None = None,
-        carbs_g: Decimal | None = None,
-        fat_g: Decimal | None = None,
-        fiber_g: Decimal | None = None,
-        sat_fat_g: Decimal | None = None,
-        sodium_mg: Decimal | None = None,
-        density_g_per_ml: Decimal | None = None,
+        calories: NumericDecimal | None = None,
+        protein_g: NumericDecimal | None = None,
+        carbs_g: NumericDecimal | None = None,
+        fat_g: NumericDecimal | None = None,
+        fiber_g: NumericDecimal | None = None,
+        sat_fat_g: NumericDecimal | None = None,
+        sodium_mg: NumericDecimal | None = None,
+        density_g_per_ml: NumericDecimal | None = None,
     ) -> UpdateFoodResult:
         try:
             result = cast(
@@ -244,6 +345,45 @@ def register_write_tools(mcp: FastMCP) -> None:
         return {
             "food": FoodResponse.model_validate(result.food).model_dump(mode="json"),
             "recompute_count": result.affected_meals_count,
+        }
+
+    @mcp.tool(
+        name="delete_food",
+        description=(
+            "Soft-delete a food with no logged history. If this food has been logged "
+            "against, use merge_food instead so past meal_items are reassigned rather "
+            "than left pointing at a deleted food."
+        ),
+    )
+    def delete_food_tool(food_id: int) -> DeleteFoodResult:
+        try:
+            food = run_with_session(delete_food, food_id=food_id)
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return FoodResponse.model_validate(food)
+
+    @mcp.tool(
+        name="merge_food",
+        description=(
+            "Merge a duplicate food into another: reassigns every meal_item.food_id "
+            "from from_id to into_id (past meals keep computing macros live, now "
+            "against into_id's current values), then soft-deletes from_id. Use this "
+            "instead of delete_food + re-adding when a food was logged as a duplicate "
+            "of one that already exists."
+        ),
+    )
+    def merge_food_tool(from_id: int, into_id: int) -> MergeFoodResult:
+        try:
+            result = cast(
+                MergeFoodDomainResult,
+                run_with_session(merge_food, from_id=from_id, into_id=into_id),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return {
+            "into_food": FoodResponse.model_validate(result.into_food).model_dump(mode="json"),
+            "from_food": FoodResponse.model_validate(result.from_food).model_dump(mode="json"),
+            "reassigned_count": result.reassigned_count,
         }
 
     @mcp.tool(
@@ -304,7 +444,10 @@ def register_write_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="set_target",
-        description="Insert a new target version effective on a date token or ISO date.",
+        description=(
+            "Insert a new target version effective on a date token or ISO date. "
+            "local_tz defaults to the server's configured timezone when omitted."
+        ),
     )
     def set_target_tool(
         base_calories: int,
@@ -312,10 +455,11 @@ def register_write_tools(mcp: FastMCP) -> None:
         carbs_g: int,
         fat_g: int,
         effective_from: str,
-        local_tz: str,
+        local_tz: str | None = None,
     ) -> SetTargetResult:
-        day = resolve_date_arg(effective_from, local_tz=local_tz)
         try:
+            tz = resolve_effective_local_tz(local_tz)
+            day = resolve_date_arg(effective_from, local_tz=tz)
             result = cast(
                 SetTargetDto,
                 run_with_session(
@@ -364,3 +508,83 @@ def register_write_tools(mcp: FastMCP) -> None:
         except DomainError as exc:
             return capture_domain_error(exc)
         return DeleteResultModel(**result)
+
+    @mcp.tool(
+        name="update_meal",
+        description=(
+            "Fix one field on an already-logged meal (meal_type, logged_at, or notes) "
+            "without touching its items. Use this instead of delete_meal + log_meal to "
+            "correct one field — that round trip risks a ghost meal if the delete races "
+            "or is forgotten. This never adds, removes, or edits items; use "
+            "update_meal_item or delete_meal_item for that."
+        ),
+    )
+    def update_meal_tool(
+        meal_id: int,
+        meal_type: MealType | None = None,
+        logged_at: datetime | None = None,
+        notes: str | None = _NOTES_UNSET,  # type: ignore[assignment]
+    ) -> UpdateMealResult:
+        domain_kwargs: dict[str, object] = {
+            "meal_id": meal_id,
+            "meal_type": meal_type,
+            "logged_at": logged_at,
+        }
+        if notes is not _NOTES_UNSET:
+            domain_kwargs["notes"] = notes
+        try:
+            meal = cast(
+                MealResponse,
+                run_with_session(update_meal, **domain_kwargs),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_meal(meal)
+
+    @mcp.tool(
+        name="update_meal_item",
+        description=(
+            "Fix one field on a single meal item: quantity, quantity_unit, food_id, or "
+            "(ad-hoc items only) macros. Use this instead of delete_meal_item + re-logging "
+            "an item to correct one field. Edits are local to this item only — they never "
+            "rewrite other meals; use update_food when the correction should propagate "
+            "everywhere that food is logged. Macro fields are rejected while food_id is "
+            "set (that item computes macros live); clear food_id to null to make it "
+            "ad-hoc, supplying calories/protein_g/carbs_g/fat_g in the same call."
+        ),
+    )
+    def update_meal_item_tool(
+        item_id: int,
+        quantity: NumericDecimal | None = None,
+        quantity_unit: QuantityUnit | None = None,
+        food_id: int | None = _FOOD_ID_UNSET,  # type: ignore[assignment]
+        calories: NumericDecimal | None = None,
+        protein_g: NumericDecimal | None = None,
+        carbs_g: NumericDecimal | None = None,
+        fat_g: NumericDecimal | None = None,
+        fiber_g: NumericDecimal | None = None,
+        sat_fat_g: NumericDecimal | None = None,
+        sodium_mg: NumericDecimal | None = None,
+    ) -> UpdateMealItemResult:
+        domain_kwargs: dict[str, object] = {
+            "item_id": item_id,
+            "quantity": quantity,
+            "quantity_unit": quantity_unit,
+            "calories": calories,
+            "protein_g": protein_g,
+            "carbs_g": carbs_g,
+            "fat_g": fat_g,
+            "fiber_g": fiber_g,
+            "sat_fat_g": sat_fat_g,
+            "sodium_mg": sodium_mg,
+        }
+        if food_id is not _FOOD_ID_UNSET:
+            domain_kwargs["food_id"] = food_id
+        try:
+            item = cast(
+                MealItemResponse,
+                run_with_session(update_meal_item, **domain_kwargs),
+            )
+        except DomainError as exc:
+            return capture_domain_error(exc)
+        return serialize_meal_item(item)

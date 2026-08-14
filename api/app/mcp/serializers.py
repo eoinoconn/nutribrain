@@ -19,6 +19,7 @@ from app.domain.dto import (
     DayResponse,
     EffectiveTarget,
     ItemMacros,
+    MealItemMatch,
     MealItemResponse,
     MealResponse,
     PeriodTotals,
@@ -29,7 +30,14 @@ from app.domain.dto import (
     TemplateResponse,
 )
 from app.domain.errors import DomainError
-from app.domain.foods import FoodSearchResult
+from app.domain.foods import FindFoodsResult, FoodSearchResult
+
+
+class FindFoodsResultModel(BaseModel):
+    """One query's candidates within a `find_foods` batch response."""
+
+    query: str
+    candidates: list[FoodSearchResponse]
 
 
 class ToolErrorResponse(BaseModel):
@@ -72,6 +80,18 @@ class MealModel(BaseModel):
     delta_vs_target: ItemMacrosModel | None
 
 
+class MealItemMatchModel(BaseModel):
+    meal_id: int
+    item_id: int
+    food_id: int | None
+    logged_at: datetime
+    local_date: date
+    name: str
+    quantity: Decimal
+    quantity_unit: QuantityUnit
+    macros: ItemMacrosModel
+
+
 class TemplateItemModel(BaseModel):
     id: int
     food_id: int | None
@@ -92,7 +112,7 @@ class TemplateModel(BaseModel):
     name: str
     created_at: datetime
     deleted_at: datetime | None
-    items: list[TemplateItemModel]
+    items: list[TemplateItemModel] | None = None
 
 
 class EffectiveTargetModel(BaseModel):
@@ -215,6 +235,20 @@ def serialize_meal(value: MealResponse) -> MealModel:
     )
 
 
+def serialize_meal_item_match(value: MealItemMatch) -> MealItemMatchModel:
+    return MealItemMatchModel(
+        meal_id=value.meal_id,
+        item_id=value.item_id,
+        food_id=value.food_id,
+        logged_at=value.logged_at,
+        local_date=value.local_date,
+        name=value.name,
+        quantity=value.quantity,
+        quantity_unit=value.quantity_unit,
+        macros=serialize_macros(value.macros),
+    )
+
+
 def serialize_template_item(value: TemplateItemResponse) -> TemplateItemModel:
     return TemplateItemModel(
         id=value.id,
@@ -232,13 +266,13 @@ def serialize_template_item(value: TemplateItemResponse) -> TemplateItemModel:
     )
 
 
-def serialize_template(value: TemplateResponse) -> TemplateModel:
+def serialize_template(value: TemplateResponse, *, include_items: bool = True) -> TemplateModel:
     return TemplateModel(
         id=value.id,
         name=value.name,
         created_at=value.created_at,
         deleted_at=value.deleted_at,
-        items=[serialize_template_item(item) for item in value.items],
+        items=[serialize_template_item(item) for item in value.items] if include_items else None,
     )
 
 
@@ -333,4 +367,11 @@ def serialize_food_search_result(value: FoodSearchResult) -> FoodSearchResponse:
         **FoodResponse.model_validate(value.food).model_dump(),
         last_logged_at=value.last_logged_at,
         logged_count=value.logged_count,
+    )
+
+
+def serialize_find_foods_result(value: FindFoodsResult) -> FindFoodsResultModel:
+    return FindFoodsResultModel(
+        query=value.query,
+        candidates=[serialize_food_search_result(item) for item in value.candidates],
     )

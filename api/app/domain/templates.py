@@ -31,8 +31,8 @@ from app.domain.dto import (
     TemplateItemSpec,
     TemplateResponse,
 )
-from app.domain.errors import TemplateNotFoundError
-from app.domain.meal_timing import resolve_meal_type
+from app.domain.errors import AdhocItemNameRequiredError, FoodNotFoundError, TemplateNotFoundError
+from app.domain.meal_timing import localize_naive_datetime, resolve_meal_type
 from app.domain.nutrition_math import compute_item_macros
 
 
@@ -53,7 +53,7 @@ def create_template(
     session.flush()
 
     for spec in items:
-        ti = _spec_to_template_item(spec, template.id)
+        ti = _spec_to_template_item(session, spec, template.id)
         session.add(ti)
 
     session.flush()
@@ -86,7 +86,7 @@ def update_template(
         session.flush()
 
         for spec in items:
-            ti = _spec_to_template_item(spec, template.id)
+            ti = _spec_to_template_item(session, spec, template.id)
             session.add(ti)
 
     session.flush()
@@ -107,22 +107,27 @@ def delete_template(
     return _template_to_response(template)
 
 
-def list_templates(session: Session, *, query: str = "") -> list[TemplateResponse]:
-    """Return non-deleted templates, optionally filtered by name substring."""
+def list_templates(
+    session: Session, *, query: str = "", include_items: bool = True
+) -> list[TemplateResponse]:
+    """Return non-deleted templates, optionally filtered by name substring.
 
-    stmt = (
-        select(Template)
-        .where(Template.deleted_at.is_(None))
-        .options(selectinload(Template.items))
-        .order_by(Template.id)
-    )
+    When ``include_items`` is False, template items are not eager-loaded from
+    the database at all (no ``selectinload``) — the returned responses carry
+    an empty ``items`` list. This is a genuine efficiency win for callers that
+    only need id + name to pick a template, not just a smaller payload.
+    """
+
+    stmt = select(Template).where(Template.deleted_at.is_(None)).order_by(Template.id)
+    if include_items:
+        stmt = stmt.options(selectinload(Template.items))
 
     lowered = query.strip().lower()
     if lowered:
         stmt = stmt.where(func.lower(Template.name).contains(lowered))
 
     templates = session.scalars(stmt).all()
-    return [_template_to_response(t) for t in templates]
+    return [_template_to_response(t, include_items=include_items) for t in templates]
 
 
 def log_template(
@@ -144,8 +149,8 @@ def log_template(
     - source: template on every resulting meal_item
     """
 
-    if logged_at.tzinfo is None:
-        raise ValueError("logged_at must be timezone-aware")
+    # A naive logged_at is interpreted in local_tz; an aware one is used as-is.
+    logged_at = localize_naive_datetime(logged_at, local_tz)
 
     template = _get_template_or_raise(session, template_id)
 
@@ -287,21 +292,25 @@ def _get_template_or_raise(session: Session, template_id: int) -> Template:
     return template
 
 
-def _spec_to_template_item(spec: TemplateItemSpec, template_id: int) -> TemplateItem:
+def _spec_to_template_item(
+    session: Session, spec: TemplateItemSpec, template_id: int
+) -> TemplateItem:
     """Convert a TemplateItemSpec to a TemplateItem ORM object."""
+
+    name = _resolve_item_name(session, food_id=spec.food_id, name=spec.name)
 
     if spec.food_id is not None:
         return TemplateItem(
             template_id=template_id,
             food_id=spec.food_id,
-            name=spec.name,
+            name=name,
             quantity=spec.quantity,
             quantity_unit=spec.quantity_unit,
         )
     return TemplateItem(
         template_id=template_id,
         food_id=None,
-        name=spec.name,
+        name=name,
         quantity=spec.quantity,
         quantity_unit=spec.quantity_unit,
         calories=spec.calories,
@@ -314,6 +323,30 @@ def _spec_to_template_item(spec: TemplateItemSpec, template_id: int) -> Template
     )
 
 
+def _resolve_item_name(session: Session, *, food_id: int | None, name: str | None) -> str:
+    """Resolve a template item's stored name (§MCP-09).
+
+    Food-linked items (food_id set) always use the referenced food's current
+    name, matching log_meal's behavior — an explicit name is ignored rather
+    than stored, so a stale caller-supplied name can never drift from the
+    food's canonical one. Ad-hoc items (food_id None) have no other source of
+    a name: an explicit name is required, and omitting it is a domain error
+    rather than a NOT NULL constraint failure.
+    """
+
+    if food_id is not None:
+        food = session.get(Food, food_id)
+        if food is None:
+            raise FoodNotFoundError(f"id:{food_id}")
+        return food.name
+
+    normalized = (name or "").strip()
+    if normalized:
+        return normalized
+
+    raise AdhocItemNameRequiredError()
+
+
 def _scale_macro(value: Decimal | None, scale: Decimal) -> Decimal | None:
     """Scale a macro value by quantity_scale, preserving None."""
 
@@ -322,8 +355,12 @@ def _scale_macro(value: Decimal | None, scale: Decimal) -> Decimal | None:
     return value * scale
 
 
-def _template_to_response(template: Template) -> TemplateResponse:
-    """Convert a Template ORM object to a TemplateResponse DTO."""
+def _template_to_response(template: Template, *, include_items: bool = True) -> TemplateResponse:
+    """Convert a Template ORM object to a TemplateResponse DTO.
+
+    When ``include_items`` is False, ``template.items`` is not accessed at all
+    (avoids triggering a lazy-load query) and the response's ``items`` is [].
+    """
 
     return TemplateResponse(
         id=template.id,
@@ -346,5 +383,7 @@ def _template_to_response(template: Template) -> TemplateResponse:
                 sodium_mg=ti.sodium_mg,
             )
             for ti in template.items
-        ],
+        ]
+        if include_items
+        else [],
     )

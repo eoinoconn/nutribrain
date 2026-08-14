@@ -18,11 +18,15 @@ from sqlalchemy.orm import Session
 from app.db import ServingUnit
 from app.domain import (
     FoodDuplicateError,
+    FoodMergeSameFoodError,
     FoodNotFoundError,
     ServingUnitImmutableError,
     add_food,
     compute_item_macros,
     delete_food,
+    find_foods,
+    merge_food,
+    search_foods,
     set_favorite_food,
     update_food,
 )
@@ -214,3 +218,175 @@ class TestDeleteFood:
 
         with pytest.raises(FoodNotFoundError):
             delete_food(db_session, food_id=food.id)
+
+
+class TestSearchFoodsNormalizedMatch:
+    """MCP-06: normalized substring pre-filter for queries with extra words/spacing."""
+
+    def test_search_foods_matches_query_with_trailing_extra_word(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="GetPRO")
+
+        results = search_foods(db_session, query="getpro yogurt")
+
+        assert any(r.food.name == "GetPRO" for r in results)
+
+    def test_search_foods_matches_query_with_internal_space_and_extra_word(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="GetPRO")
+
+        results = search_foods(db_session, query="get pro yogurt")
+
+        assert any(r.food.name == "GetPRO" for r in results)
+
+
+class TestMergeFood:
+    def test_merge_food_reassigns_meal_items_and_leaves_others_untouched(
+        self, db_session: Session, make_food, make_meal, make_meal_item
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+        other_food = make_food(name="Unrelated Food")
+
+        meal = make_meal()
+        item = make_meal_item(food=from_food, meal_id=meal.id)
+        other_item = make_meal_item(food=other_food, meal_id=meal.id)
+
+        result = merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+        db_session.refresh(item)
+        db_session.refresh(other_item)
+        assert item.food_id == into_food.id
+        assert other_item.food_id == other_food.id
+        assert result.reassigned_count == 1
+
+    def test_merge_food_soft_deletes_from_food_and_excludes_it_from_search(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+
+        result = merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+        assert result.from_food.deleted_at is not None
+        results = search_foods(db_session, query="Duplicate Yogurt")
+        assert all(r.food.id != from_food.id for r in results)
+
+    def test_merge_food_into_nonexistent_raises_not_found(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+
+        with pytest.raises(FoodNotFoundError):
+            merge_food(db_session, from_id=from_food.id, into_id=999999)
+
+    def test_merge_food_from_already_deleted_raises_not_found(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+        delete_food(db_session, food_id=from_food.id)
+
+        with pytest.raises(FoodNotFoundError):
+            merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+    def test_merge_food_into_already_deleted_raises_not_found(
+        self, db_session: Session, make_food
+    ) -> None:
+        from_food = make_food(name="Duplicate Yogurt")
+        into_food = make_food(name="GetPRO")
+        delete_food(db_session, food_id=into_food.id)
+
+        with pytest.raises(FoodNotFoundError):
+            merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+    def test_merge_food_self_merge_raises_domain_error(
+        self, db_session: Session, make_food
+    ) -> None:
+        food = make_food(name="GetPRO")
+
+        with pytest.raises(FoodMergeSameFoodError) as exc_info:
+            merge_food(db_session, from_id=food.id, into_id=food.id)
+
+        assert exc_info.value.error == "food_merge_same_food"
+
+    def test_merge_food_reassigned_items_compute_against_into_foods_current_macros(
+        self, db_session: Session, make_food, make_meal, make_meal_item
+    ) -> None:
+        """No macro snapshot is taken on merge: reassigned items compute live."""
+
+        from_food = make_food(
+            name="Duplicate Yogurt",
+            serving_size=Decimal("100"),
+            serving_unit=ServingUnit.g,
+            calories=Decimal("100"),
+            protein_g=Decimal("10"),
+            carbs_g=Decimal("10"),
+            fat_g=Decimal("1"),
+        )
+        into_food = make_food(
+            name="GetPRO",
+            serving_size=Decimal("100"),
+            serving_unit=ServingUnit.g,
+            calories=Decimal("500"),
+            protein_g=Decimal("50"),
+            carbs_g=Decimal("40"),
+            fat_g=Decimal("10"),
+        )
+        meal = make_meal()
+        item = make_meal_item(food=from_food, meal_id=meal.id, quantity=Decimal("100"))
+
+        merge_food(db_session, from_id=from_food.id, into_id=into_food.id)
+
+        db_session.refresh(item)
+        db_session.refresh(into_food)
+        macros = compute_item_macros(item, into_food)
+        assert macros.calories == Decimal("500")
+
+
+class TestFindFoods:
+    """MCP-07: batch food search, one round-trip for several item names."""
+
+    def test_find_foods_returns_one_result_per_query_with_own_candidates(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="Bagel")
+        make_food(name="Banana")
+        make_food(name="Oatmeal")
+
+        results = find_foods(db_session, queries=["bagel", "banana", "oatmeal"])
+
+        assert [r.query for r in results] == ["bagel", "banana", "oatmeal"]
+        assert any(c.food.name == "Bagel" for c in results[0].candidates)
+        assert any(c.food.name == "Banana" for c in results[1].candidates)
+        assert any(c.food.name == "Oatmeal" for c in results[2].candidates)
+
+    def test_find_foods_empty_queries_list_returns_empty_list(self, db_session: Session) -> None:
+        results = find_foods(db_session, queries=[])
+
+        assert results == []
+
+    def test_find_foods_query_with_no_matches_returns_empty_candidates_not_dropped(
+        self, db_session: Session, make_food
+    ) -> None:
+        make_food(name="Bagel")
+
+        results = find_foods(db_session, queries=["bagel", "xyznonexistent"])
+
+        assert [r.query for r in results] == ["bagel", "xyznonexistent"]
+        assert results[1].candidates == []
+
+    def test_find_foods_applies_limit_per_query_not_globally(
+        self, db_session: Session, make_food
+    ) -> None:
+        for i in range(3):
+            make_food(name=f"Apple Variant {i}")
+        for i in range(3):
+            make_food(name=f"Pear Variant {i}")
+
+        results = find_foods(db_session, queries=["apple", "pear"], limit=2)
+
+        assert len(results[0].candidates) == 2
+        assert len(results[1].candidates) == 2

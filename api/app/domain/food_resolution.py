@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.db import Food, Meal, MealItem
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD, RECENT_LOOKBACK_DAYS
 from app.domain.dto import FoodCandidate
-from app.domain.errors import FoodAmbiguousError, FoodNotFoundError
+from app.domain.errors import AdhocItemNameRequiredError, FoodAmbiguousError, FoodNotFoundError
 
 
 def resolve_food(
@@ -39,7 +39,11 @@ def resolve_food(
     normalized_name = (name or "").strip()
     if not normalized_name:
         if has_supplied_macros:
-            return None
+            # food_id is None (checked above) and no name was given: this is
+            # an ad-hoc item (macros supplied) with nothing to name it. Raise
+            # explicitly rather than let a NULL name reach the meal_item/
+            # template_item NOT NULL constraint as an opaque DB error.
+            raise AdhocItemNameRequiredError()
         raise FoodNotFoundError("(missing name)")
 
     candidates = _find_food_candidates(session, normalized_name, now)

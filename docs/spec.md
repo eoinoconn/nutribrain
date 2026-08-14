@@ -982,7 +982,7 @@ Establishes backups actually work.
 | `INTERVALS_API_KEY` | api, cron | intervals.icu HTTP Basic password |
 | `INTERVALS_ATHLETE_ID` | api, cron | intervals.icu athlete id |
 | `INTERVALS_SYNC_DAYS` | cron | Days of history to sync nightly (default 3) |
-| `TZ` | api, cron | `Europe/Dublin` |
+| `TZ` | api, cron, mcp | `Europe/Dublin`. Also the MCP server's default effective local timezone when a tool call omits `local_tz` |
 | `LOG_LEVEL` | api | `INFO` default, `DEBUG` for deep dives |
 | `SENTRY_DSN` | api, web | Optional |
 | `VITE_API_BASE` | web build | API base URL |
@@ -1020,12 +1020,18 @@ All API and MCP tool errors follow:
 Error codes agents should handle:
 - `unauthorized` — 401
 - `food_not_found` — no fuzzy match for a name
+- `adhoc_item_name_required` — an ad-hoc meal/template item (no `food_id`) was given no `name`
 - `food_ambiguous` — multiple matches, no resolution rule fires
 - `food_duplicate` — `add_food` name collision without `force: true`
 - `serving_unit_immutable` — `update_food` attempt to change serving unit
+- `food_merge_same_food` — `merge_food` called with `from_id` equal to `into_id`
 - `template_not_found`
 - `intervals_unavailable` — sync failed
-- `invalid_timezone` — `PATCH /api/settings` received a value that isn't a valid IANA timezone name
+- `meal_not_found`
+- `meal_item_not_found`
+- `meal_item_food_linked` — `update_meal_item` attempt to edit macros while `food_id` is set
+- `meal_item_macros_required` — `update_meal_item` cleared `food_id` without supplying the now-required macros
+- `invalid_timezone` — an explicit `local_tz` argument, the account's effective-default timezone (`app_settings.local_timezone`), or a `PATCH /api/settings` value is not a valid IANA timezone name
 - `naive_datetime` — a timestamp field (e.g. `POST /api/planned-workouts` `start_at`) is missing a UTC offset
 - `no_target_set` — `compute_energy_timeline` was asked for a day with no effective target set
 

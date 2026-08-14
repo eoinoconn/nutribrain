@@ -21,7 +21,7 @@ from app.domain.dto import (
     MealResponse,
 )
 from app.domain.food_resolution import resolve_food
-from app.domain.meal_timing import resolve_meal_type
+from app.domain.meal_timing import localize_naive_datetime, resolve_meal_type
 from app.domain.nutrition_math import compute_item_macros
 from app.domain.targets import get_effective_target
 from app.logging import get_logger
@@ -51,7 +51,9 @@ def log_meal(
     Args:
         session: Active SQLAlchemy session.
         items: List of item specs to resolve and log.
-        logged_at: Timezone-aware timestamp (UTC) when the meal was eaten.
+        logged_at: Timestamp when the meal was eaten. If naive, it is
+            interpreted in local_tz; if aware (carries an offset/UTC), it is
+            used as-is.
         local_tz: IANA timezone name (e.g. "Europe/Dublin").
         meal_type: Optional override (breakfast/lunch/dinner/snack).
         notes: Optional meal notes.
@@ -61,13 +63,12 @@ def log_meal(
         MealResponse with created meal, resolved items, totals, and delta.
 
     Raises:
-        ValueError: If logged_at is not timezone-aware.
         FoodNotFoundError: If an item cannot be resolved and no macros supplied.
         FoodAmbiguousError: If an item matches multiple foods without a tie-breaker.
     """
 
-    if logged_at.tzinfo is None:
-        raise ValueError("logged_at must be timezone-aware")
+    # A naive logged_at is interpreted in local_tz; an aware one is used as-is.
+    logged_at = localize_naive_datetime(logged_at, local_tz)
 
     # Derive local_date from logged_at in the meal's timezone
     local_dt = logged_at.astimezone(ZoneInfo(local_tz))

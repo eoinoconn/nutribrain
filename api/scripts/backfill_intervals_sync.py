@@ -20,7 +20,8 @@ upserts on ``(source, external_id)``, so re-syncing an already-synced day is a
 no-op change, not a duplicate.
 
 Usage:
-  uv run --project api python api/scripts/backfill_intervals_sync.py --from 2026-07-24 --to 2026-08-03
+  uv run --project api python api/scripts/backfill_intervals_sync.py \
+      --from 2026-07-24 --to 2026-08-03
   uv run --project api python api/scripts/backfill_intervals_sync.py --days 14 --yes
 """
 
@@ -29,7 +30,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 API_DIR = Path(__file__).resolve().parents[1]
@@ -82,7 +83,7 @@ def main() -> int:
         return 2
 
     if args.days is not None:
-        to_date = datetime.now().date()
+        to_date = datetime.now(UTC).date()
         from_date = to_date - timedelta(days=args.days - 1)
     elif args.from_date and args.to_date:
         from_date, to_date = args.from_date, args.to_date

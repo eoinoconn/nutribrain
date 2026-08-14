@@ -18,6 +18,7 @@ from app.domain.dto import (
     FuelingFlag,
     ItemMacros,
     ManualCaloriesOutResult,
+    MealItemMatch,
     MealItemResponse,
     MealItemSpec,
     MealResponse,
@@ -34,12 +35,16 @@ from app.domain.dto import (
 )
 from app.domain.energy_balance import compute_energy_timeline
 from app.domain.errors import (
+    AdhocItemNameRequiredError,
     DomainError,
     FoodAmbiguousError,
     FoodDuplicateError,
+    FoodMergeSameFoodError,
     FoodNotFoundError,
     IntervalsUnavailableError,
     InvalidTimezoneError,
+    MealItemFoodLinkedError,
+    MealItemMacrosRequiredError,
     MealItemNotFoundError,
     MealNotFoundError,
     NaiveDatetimeError,
@@ -51,18 +56,30 @@ from app.domain.errors import (
 from app.domain.food_resolution import resolve_food
 from app.domain.foods import (
     AddFoodResult,
+    FindFoodsResult,
     FoodSearchResult,
+    MergeFoodResult,
     UpdateFoodResult,
     add_food,
     delete_food,
+    find_foods,
+    merge_food,
     search_foods,
     set_favorite_food,
     update_food,
 )
 from app.domain.intervals_sync import get_sync_status, set_manual_calories_out, sync_intervals
+from app.domain.meal_copying import copy_meal
 from app.domain.meal_deletion import delete_meal, delete_meal_item
+from app.domain.meal_editing import update_meal, update_meal_item
 from app.domain.meal_logging import log_meal
-from app.domain.meal_timing import infer_meal_type, parse_local_date, resolve_meal_type
+from app.domain.meal_search import find_meal
+from app.domain.meal_timing import (
+    infer_meal_type,
+    localize_naive_datetime,
+    parse_local_date,
+    resolve_meal_type,
+)
 from app.domain.nutrition_math import (
     UnitNormalizationError,
     compute_item_macros,
@@ -82,6 +99,7 @@ from app.domain.templates import (
 __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
     "AddFoodResult",
+    "AdhocItemNameRequiredError",
     "AppSettingsDTO",
     "DayMealGroup",
     "DayResponse",
@@ -90,9 +108,11 @@ __all__ = [
     "EnergyEvent",
     "EnergyPoint",
     "EnergyTimeline",
+    "FindFoodsResult",
     "FoodAmbiguousError",
     "FoodCandidate",
     "FoodDuplicateError",
+    "FoodMergeSameFoodError",
     "FoodNotFoundError",
     "FoodSearchResult",
     "FuelingFlag",
@@ -100,11 +120,15 @@ __all__ = [
     "InvalidTimezoneError",
     "ItemMacros",
     "ManualCaloriesOutResult",
+    "MealItemFoodLinkedError",
+    "MealItemMacrosRequiredError",
+    "MealItemMatch",
     "MealItemNotFoundError",
     "MealItemResponse",
     "MealItemSpec",
     "MealNotFoundError",
     "MealResponse",
+    "MergeFoodResult",
     "NaiveDatetimeError",
     "NoTargetSetError",
     "PeriodTotals",
@@ -125,12 +149,15 @@ __all__ = [
     "add_food",
     "compute_energy_timeline",
     "compute_item_macros",
+    "copy_meal",
     "create_manual_planned_workout",
     "create_template",
     "delete_food",
     "delete_meal",
     "delete_meal_item",
     "delete_template",
+    "find_foods",
+    "find_meal",
     "get_day",
     "get_effective_target",
     "get_range",
@@ -139,8 +166,10 @@ __all__ = [
     "infer_meal_type",
     "list_targets",
     "list_templates",
+    "localize_naive_datetime",
     "log_meal",
     "log_template",
+    "merge_food",
     "normalize_to_grams",
     "parse_local_date",
     "resolve_food",
@@ -151,6 +180,8 @@ __all__ = [
     "set_target",
     "sync_intervals",
     "update_food",
+    "update_meal",
+    "update_meal_item",
     "update_settings",
     "update_template",
 ]

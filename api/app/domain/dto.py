@@ -38,11 +38,16 @@ class FoodCandidate:
 
 @dataclass(frozen=True, slots=True)
 class MealItemSpec:
-    """Input spec for a single item being logged (§4)."""
+    """Input spec for a single item being logged (§4).
 
-    name: str
+    ``name`` is optional when ``food_id`` is set — the domain layer fills it
+    in from the resolved food's current name. It is required when ``food_id``
+    is None (ad-hoc items have no other source of a name).
+    """
+
     quantity: Decimal
     quantity_unit: QuantityUnit
+    name: str | None = None
     food_id: int | None = None
     calories: Decimal | None = None
     protein_g: Decimal | None = None
@@ -82,12 +87,36 @@ class MealItemResponse:
 
 
 @dataclass(frozen=True, slots=True)
-class TemplateItemSpec:
-    """Input spec for a single template item."""
+class MealItemMatch:
+    """A meal item matched by :func:`app.domain.meal_search.find_meal`.
 
+    Carries enough context (``meal_id``, ``item_id``) to feed directly into
+    ``copy_meal`` or ``update_meal_item`` without another round-trip.
+    """
+
+    meal_id: int
+    item_id: int
+    food_id: int | None
+    logged_at: datetime
+    local_date: date
     name: str
     quantity: Decimal
     quantity_unit: QuantityUnit
+    macros: ItemMacros
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateItemSpec:
+    """Input spec for a single template item.
+
+    ``name`` is optional when ``food_id`` is set — the domain layer fills it
+    in from the referenced food's current name. It is required when
+    ``food_id`` is None (ad-hoc items have no other source of a name).
+    """
+
+    quantity: Decimal
+    quantity_unit: QuantityUnit
+    name: str | None = None
     food_id: int | None = None
     calories: Decimal | None = None
     protein_g: Decimal | None = None

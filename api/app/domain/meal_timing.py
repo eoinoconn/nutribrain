@@ -34,7 +34,17 @@ def infer_meal_type(logged_at: datetime, local_tz: str) -> MealType:
 
 
 def resolve_meal_type(meal_type: MealType | None, logged_at: datetime, local_tz: str) -> MealType:
-    """Return caller-provided meal_type or infer it from local time."""
+    """Return caller-provided meal_type or infer it from local time.
+
+    When `meal_type` is omitted (None), it is inferred from `logged_at`'s
+    local clock time (see `infer_meal_type` for the exact windows):
+    - breakfast: 04:00-10:59
+    - lunch: 11:00-15:59
+    - dinner: 16:00-21:59
+    - snack: 22:00-03:59 (and any non-matching edge)
+    An explicitly supplied `meal_type` is always honored as-is, with no
+    re-inference.
+    """
 
     if meal_type is not None:
         return meal_type
@@ -61,6 +71,25 @@ def parse_local_date(value: str | date, local_tz: str, now: datetime | None = No
         return date.fromisoformat(token)
     except ValueError as exc:
         raise ValueError("Date must be 'today', 'yesterday', or ISO YYYY-MM-DD") from exc
+
+
+def localize_naive_datetime(value: datetime, local_tz: str) -> datetime:
+    """Interpret a naive datetime in `local_tz`; pass an aware datetime through unchanged.
+
+    A naive `logged_at` (no offset/`Z`) is localized by attaching `local_tz` as
+    its tzinfo — the wall-clock value is taken as-is in that zone. An aware
+    datetime already carries an explicit offset and is returned unchanged.
+
+    DST edge cases: `zoneinfo` resolves ambiguous times (fall-back) using the
+    default `fold=0` (the earlier of the two occurrences) and non-existent
+    times (spring-forward gap) by extrapolating the offset that was in effect
+    before the gap, per PEP 495. Neither case raises; both are accepted as-is
+    without extra disambiguation, which is sufficient for a single-user app.
+    """
+
+    if value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=ZoneInfo(local_tz))
 
 
 def _to_local_time(logged_at: datetime, local_tz: str) -> time:

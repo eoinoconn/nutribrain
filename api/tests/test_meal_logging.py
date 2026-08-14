@@ -13,7 +13,7 @@ from app.domain import (
     MealItemSpec,
     log_meal,
 )
-from app.domain.errors import FoodAmbiguousError, FoodNotFoundError
+from app.domain.errors import AdhocItemNameRequiredError, FoodAmbiguousError, FoodNotFoundError
 
 
 @pytest.fixture
@@ -342,6 +342,124 @@ def test_log_meal_unresolved_food_with_macros_logs_adhoc(
     assert item.macros.calories == Decimal("150")
 
 
+def test_log_meal_food_linked_item_name_omitted_uses_food_name(
+    db_session: Session,
+    frozen_logged_at: datetime,
+    dublin_tz: str,
+) -> None:
+    """MCP-09: name is optional when food_id is set; falls back to the food's name."""
+
+    food = Food(
+        name="Oats",
+        serving_size=Decimal("100"),
+        serving_unit=ServingUnit.g,
+        calories=Decimal("389"),
+        protein_g=Decimal("16.7"),
+        carbs_g=Decimal("66.3"),
+        fat_g=Decimal("6.9"),
+    )
+    db_session.add(food)
+    db_session.flush()
+
+    items = [
+        MealItemSpec(
+            quantity=Decimal("50"),
+            quantity_unit=QuantityUnit.g,
+            food_id=food.id,
+            # name omitted entirely
+        ),
+    ]
+
+    response = log_meal(
+        db_session,
+        items=items,
+        logged_at=frozen_logged_at,
+        local_tz=dublin_tz,
+    )
+
+    assert len(response.items) == 1
+    item = response.items[0]
+    assert item.food_id == food.id
+    assert item.name == "Oats"
+
+
+def test_log_meal_food_linked_item_explicit_name_still_works(
+    db_session: Session,
+    frozen_logged_at: datetime,
+    dublin_tz: str,
+) -> None:
+    """MCP-09: an explicit name on a food-linked item is backward compatible.
+
+    Finding: food-linked meal items already ignore the spec's name in favor of
+    the resolved food's current name (see log_meal's `item_name =
+    resolved_food.name`), so an explicit name here was already cosmetic/
+    overridden server-side prior to this change. This test only confirms the
+    call still succeeds when a name is explicitly supplied alongside food_id.
+    """
+
+    food = Food(
+        name="Oats",
+        serving_size=Decimal("100"),
+        serving_unit=ServingUnit.g,
+        calories=Decimal("389"),
+        protein_g=Decimal("16.7"),
+        carbs_g=Decimal("66.3"),
+        fat_g=Decimal("6.9"),
+    )
+    db_session.add(food)
+    db_session.flush()
+
+    items = [
+        MealItemSpec(
+            name="My Morning Oats",
+            quantity=Decimal("50"),
+            quantity_unit=QuantityUnit.g,
+            food_id=food.id,
+        ),
+    ]
+
+    response = log_meal(
+        db_session,
+        items=items,
+        logged_at=frozen_logged_at,
+        local_tz=dublin_tz,
+    )
+
+    assert len(response.items) == 1
+    assert response.items[0].food_id == food.id
+    # Already-existing behavior: food-linked items use the food's current
+    # name, not the caller-supplied one.
+    assert response.items[0].name == "Oats"
+
+
+def test_log_meal_adhoc_item_name_omitted_raises(
+    db_session: Session,
+    frozen_logged_at: datetime,
+    dublin_tz: str,
+) -> None:
+    """MCP-09: an ad-hoc item (no food_id) with no name raises a clear domain error."""
+
+    items = [
+        MealItemSpec(
+            quantity=Decimal("100"),
+            quantity_unit=QuantityUnit.g,
+            calories=Decimal("150"),
+            protein_g=Decimal("5"),
+            carbs_g=Decimal("25"),
+            fat_g=Decimal("4"),
+            # No food_id, no name, macros supplied
+        ),
+    ]
+
+    with pytest.raises(AdhocItemNameRequiredError):
+        log_meal(
+            db_session,
+            items=items,
+            logged_at=frozen_logged_at,
+            local_tz=dublin_tz,
+        )
+
+
 def test_log_meal_local_date_derived_from_timezone(
     db_session: Session,
 ) -> None:
@@ -525,3 +643,86 @@ def test_log_meal_persists_to_database(
     assert meal is not None
     assert meal.logged_at == frozen_logged_at
     assert len(meal.items) == 1
+
+
+class TestLogMealLoggedAtLocalization:
+    """MCP-05: naive logged_at is localized via local_tz; aware is used as-is."""
+
+    def test_aware_logged_at_is_unchanged(
+        self,
+        db_session: Session,
+        dublin_tz: str,
+    ) -> None:
+        aware = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
+        items = [
+            MealItemSpec(
+                name="Ad-hoc",
+                quantity=Decimal("100"),
+                quantity_unit=QuantityUnit.g,
+                calories=Decimal("100"),
+                protein_g=Decimal("1"),
+                carbs_g=Decimal("1"),
+                fat_g=Decimal("1"),
+            ),
+        ]
+
+        response = log_meal(db_session, items=items, logged_at=aware, local_tz=dublin_tz)
+
+        assert response.logged_at == aware
+
+    def test_naive_logged_at_is_localized_to_local_tz(
+        self,
+        db_session: Session,
+        dublin_tz: str,
+    ) -> None:
+        naive = datetime(2026, 1, 15, 20, 0)  # noqa: DTZ001
+        items = [
+            MealItemSpec(
+                name="Ad-hoc",
+                quantity=Decimal("100"),
+                quantity_unit=QuantityUnit.g,
+                calories=Decimal("100"),
+                protein_g=Decimal("1"),
+                carbs_g=Decimal("1"),
+                fat_g=Decimal("1"),
+            ),
+        ]
+
+        response = log_meal(db_session, items=items, logged_at=naive, local_tz=dublin_tz)
+
+        # Winter: Europe/Dublin is UTC+0, so the naive wall-clock time maps
+        # 1:1 onto UTC.
+        assert response.logged_at == datetime(2026, 1, 15, 20, 0, tzinfo=UTC)
+
+    def test_naive_logged_at_crosses_dst_transition(
+        self,
+        db_session: Session,
+        dublin_tz: str,
+    ) -> None:
+        def _item() -> MealItemSpec:
+            return MealItemSpec(
+                name="Ad-hoc",
+                quantity=Decimal("100"),
+                quantity_unit=QuantityUnit.g,
+                calories=Decimal("100"),
+                protein_g=Decimal("1"),
+                carbs_g=Decimal("1"),
+                fat_g=Decimal("1"),
+            )
+
+        before_dst = log_meal(
+            db_session,
+            items=[_item()],
+            logged_at=datetime(2026, 3, 1, 12, 0),  # noqa: DTZ001
+            local_tz=dublin_tz,
+        )
+        after_dst = log_meal(
+            db_session,
+            items=[_item()],
+            logged_at=datetime(2026, 4, 1, 12, 0),  # noqa: DTZ001
+            local_tz=dublin_tz,
+        )
+
+        # Pre-transition: UTC+0. Post-transition: UTC+1.
+        assert before_dst.logged_at == datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        assert after_dst.logged_at == datetime(2026, 4, 1, 11, 0, tzinfo=UTC)

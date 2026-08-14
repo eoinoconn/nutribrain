@@ -11,11 +11,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db import get_session, session_scope
-from app.domain import get_sync_status, parse_local_date, set_manual_calories_out, sync_intervals
+from app.domain import (
+    get_settings,
+    get_sync_status,
+    parse_local_date,
+    set_manual_calories_out,
+    sync_intervals,
+)
 from app.domain.intervals_sync import StatusSessionFactory
 from app.domain.planned_workouts import FetchActivitiesDetailed, FetchPlannedEvents
 from app.intervals.client import fetch_activities_detailed, fetch_planned_events
-from app.settings import settings
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 DbSession = Annotated[Session, Depends(get_session)]
@@ -76,7 +81,8 @@ def sync_intervals_route(
 ) -> SyncIntervalsResponse:
     """Sync today's planned_workouts (§8 "Dashboard button", EC-07)."""
 
-    today = parse_local_date("today", local_tz=settings.tz)
+    local_tz = get_settings(session).local_timezone
+    today = parse_local_date("today", local_tz=local_tz)
     result = sync_intervals(
         session,
         from_date=today,

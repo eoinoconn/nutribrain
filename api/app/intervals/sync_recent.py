@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timedelta
 
 from app.db import session_scope
-from app.domain import parse_local_date, sync_intervals
+from app.domain import get_settings, parse_local_date, sync_intervals
 from app.domain.errors import DomainError
 from app.domain.intervals_sync import StatusSessionFactory
 from app.logging import configure_logging, get_logger
@@ -31,13 +31,13 @@ def main(
     session_factory: StatusSessionFactory = session_scope,
     now: datetime | None = None,
 ) -> int:
-    today = parse_local_date("today", local_tz=settings.tz, now=now)
-    to_date = today - timedelta(days=1)
-    from_date = to_date - timedelta(days=settings.intervals_sync_days - 1)
-
     started = time.monotonic()
     try:
         with session_factory() as session:
+            local_tz = get_settings(session).local_timezone
+            today = parse_local_date("today", local_tz=local_tz, now=now)
+            to_date = today - timedelta(days=1)
+            from_date = to_date - timedelta(days=settings.intervals_sync_days - 1)
             result = sync_intervals(session, from_date=from_date, to_date=to_date)
     except DomainError as exc:
         logger.error(

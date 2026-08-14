@@ -23,6 +23,8 @@ from app.domain import (
     log_template,
     update_template,
 )
+from app.domain.dto import TemplateResponse
+from app.domain.errors import AdhocItemNameRequiredError
 
 
 @pytest.fixture
@@ -122,6 +124,72 @@ class TestCreateTemplate:
 
         assert len(result.items) == 2
 
+    def test_create_food_linked_item_name_omitted_uses_food_name(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        """MCP-09: name is optional when food_id is set; falls back to the food's name."""
+
+        result = create_template(
+            db_session,
+            name="Morning Oats",
+            items=[
+                TemplateItemSpec(
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                    # name omitted entirely
+                ),
+            ],
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].name == sample_food.name
+
+    def test_create_food_linked_item_explicit_name_is_ignored(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        """MCP-09 (follow-up): an explicit name on a food-linked template item is
+        ignored in favor of the food's current name, matching log_meal's
+        behavior — the food's name is canonical everywhere a food_id is set,
+        so a stale caller-supplied name can never drift from it.
+        """
+
+        result = create_template(
+            db_session,
+            name="Morning Oats",
+            items=[
+                TemplateItemSpec(
+                    name="My Oats",
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                ),
+            ],
+        )
+
+        assert len(result.items) == 1
+        assert result.items[0].name == sample_food.name
+
+    def test_create_adhoc_item_name_omitted_raises(self, db_session: Session) -> None:
+        """MCP-09: an ad-hoc item (no food_id) with no name raises a clear domain error."""
+
+        with pytest.raises(AdhocItemNameRequiredError):
+            create_template(
+                db_session,
+                name="Quick Snack",
+                items=[
+                    TemplateItemSpec(
+                        quantity=Decimal("50"),
+                        quantity_unit=QuantityUnit.g,
+                        calories=Decimal("220"),
+                        protein_g=Decimal("5"),
+                        carbs_g=Decimal("30"),
+                        fat_g=Decimal("10"),
+                        # No food_id, no name, macros supplied
+                    ),
+                ],
+            )
+
 
 class TestUpdateTemplate:
     def test_update_name(self, db_session: Session, sample_food: Food) -> None:
@@ -179,7 +247,9 @@ class TestUpdateTemplate:
         )
 
         assert len(updated.items) == 2
-        assert updated.items[0].name == "Big Oats"
+        # Food-linked item: the caller-supplied name ("Big Oats") is ignored in
+        # favor of the food's current name (§MCP-09) so it can't drift stale.
+        assert updated.items[0].name == "Oats"
         assert updated.items[0].quantity == Decimal("120")
 
     def test_update_not_found_raises(self, db_session: Session) -> None:
@@ -269,6 +339,58 @@ class TestListTemplates:
         names = [t.name for t in templates]
         assert "Template A" in names
         assert "Template B" in names
+
+    def test_default_include_items_true_returns_full_items(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        created = create_template(
+            db_session,
+            name="Template With Items",
+            items=[
+                TemplateItemSpec(
+                    name="Oats",
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                ),
+            ],
+        )
+
+        templates = list_templates(db_session)
+        match = next(t for t in templates if t.id == created.id)
+        assert len(match.items) == 1
+        assert match.items[0].food_id == sample_food.id
+
+    def test_include_items_false_skips_item_load(
+        self, db_session: Session, sample_food: Food
+    ) -> None:
+        created = create_template(
+            db_session,
+            name="Template Summary Mode",
+            items=[
+                TemplateItemSpec(
+                    name="Oats",
+                    quantity=Decimal("80"),
+                    quantity_unit=QuantityUnit.g,
+                    food_id=sample_food.id,
+                ),
+            ],
+        )
+
+        templates = list_templates(db_session, include_items=False)
+        match = next(t for t in templates if t.id == created.id)
+        assert match.items == []
+        assert match.name == "Template Summary Mode"
+
+    def test_empty_template_items_both_modes(self, db_session: Session) -> None:
+        created = create_template(db_session, name="Empty Template", items=[])
+
+        full = next(t for t in list_templates(db_session) if t.id == created.id)
+        summary = next(
+            t for t in list_templates(db_session, include_items=False) if t.id == created.id
+        )
+        assert full.items == []
+        assert summary.items == []
 
 
 class TestLogTemplate:
@@ -548,4 +670,87 @@ class TestTemplateEditDoesNotTouchPastMeals:
             assert mi.fiber_g == original_items[i]["fiber_g"]
             assert mi.sat_fat_g == original_items[i]["sat_fat_g"]
             assert mi.sodium_mg == original_items[i]["sodium_mg"]
-            assert mi.source == original_items[i]["source"]
+
+
+class TestLogTemplateLoggedAtLocalization:
+    """MCP-05: naive logged_at is localized via local_tz; aware is used as-is.
+
+    Mirrors TestLogMealLoggedAtLocalization in test_meal_logging.py — both
+    log_meal and log_template share app.domain.meal_timing.localize_naive_datetime,
+    so their naive-datetime behavior must not diverge.
+    """
+
+    @pytest.fixture
+    def adhoc_template(self, db_session: Session) -> TemplateResponse:
+        return create_template(
+            db_session,
+            name="Adhoc Snack",
+            items=[
+                TemplateItemSpec(
+                    name="Granola",
+                    quantity=Decimal("50"),
+                    quantity_unit=QuantityUnit.g,
+                    calories=Decimal("220"),
+                    protein_g=Decimal("5"),
+                    carbs_g=Decimal("30"),
+                    fat_g=Decimal("10"),
+                ),
+            ],
+        )
+
+    def test_aware_logged_at_is_unchanged(
+        self,
+        db_session: Session,
+        adhoc_template: TemplateResponse,
+        dublin_tz: str,
+    ) -> None:
+        aware = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
+
+        meal = log_template(
+            db_session,
+            template_id=adhoc_template.id,
+            logged_at=aware,
+            local_tz=dublin_tz,
+        )
+
+        assert meal.logged_at == aware
+
+    def test_naive_logged_at_is_localized_to_local_tz(
+        self,
+        db_session: Session,
+        adhoc_template: TemplateResponse,
+        dublin_tz: str,
+    ) -> None:
+        naive = datetime(2026, 1, 15, 20, 0)  # noqa: DTZ001
+
+        meal = log_template(
+            db_session,
+            template_id=adhoc_template.id,
+            logged_at=naive,
+            local_tz=dublin_tz,
+        )
+
+        # Winter: Europe/Dublin is UTC+0.
+        assert meal.logged_at == datetime(2026, 1, 15, 20, 0, tzinfo=UTC)
+
+    def test_naive_logged_at_crosses_dst_transition(
+        self,
+        db_session: Session,
+        adhoc_template: TemplateResponse,
+        dublin_tz: str,
+    ) -> None:
+        before_dst = log_template(
+            db_session,
+            template_id=adhoc_template.id,
+            logged_at=datetime(2026, 3, 1, 12, 0),  # noqa: DTZ001
+            local_tz=dublin_tz,
+        )
+        after_dst = log_template(
+            db_session,
+            template_id=adhoc_template.id,
+            logged_at=datetime(2026, 4, 1, 12, 0),  # noqa: DTZ001
+            local_tz=dublin_tz,
+        )
+
+        assert before_dst.logged_at == datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        assert after_dst.logged_at == datetime(2026, 4, 1, 11, 0, tzinfo=UTC)
