@@ -1,4 +1,4 @@
-const ISO_TIME_PATTERN = /T(\d{2}):(\d{2})/;
+const ISO_TIME_PATTERN = /T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /**
  * Formats the wall-clock time encoded in an ISO datetime string without
