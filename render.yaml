@@ -50,7 +50,7 @@ services:
     name: nutrition-cron
     runtime: python
     rootDir: api
-    schedule: "0 3 * * *"          # 03:00 UTC
+    schedule: "0 11,18 * * *"      # 12:00 & 19:00 Irish time (IST=UTC+1); Render cron is UTC-only and won't auto-adjust for DST — shift to 12,19 UTC when Ireland switches back to GMT
     buildCommand: uv sync
     startCommand: uv run python -m app.intervals.sync_recent
     envVars:
