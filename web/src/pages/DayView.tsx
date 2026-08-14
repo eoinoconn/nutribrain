@@ -43,6 +43,7 @@ import { QuickMacroEntry, type QuickMacroValue } from "../components/QuickMacroE
 import EnergyChart from "../components/EnergyChart";
 import { DayHeader, SummaryRow } from "../components/DaySummary";
 import { MEAL_TYPE_LABELS, formatCalories, formatGrams } from "../components/daySummaryHelpers";
+import { formatWallClockTime } from "../lib/wallClockTime";
 import {
   buildCreateMealRequest,
   buildQuickMacroRequest,
@@ -705,7 +706,7 @@ export default function DayView(): JSX.Element {
                 >
                   <span className="flex items-baseline gap-2">
                     <span className="text-xs font-medium uppercase tracking-wide text-ink-tertiary dark:text-ink-tertiary-dark">
-                      {new Date(workout.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {formatWallClockTime(workout.startAt)}
                     </span>
                     <span className="font-medium">{name}</span>
                   </span>
