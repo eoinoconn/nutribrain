@@ -247,7 +247,9 @@ class TestUpdateTemplate:
         )
 
         assert len(updated.items) == 2
-        assert updated.items[0].name == "Big Oats"
+        # Food-linked item: the caller-supplied name ("Big Oats") is ignored in
+        # favor of the food's current name (§MCP-09) so it can't drift stale.
+        assert updated.items[0].name == "Oats"
         assert updated.items[0].quantity == Decimal("120")
 
     def test_update_not_found_raises(self, db_session: Session) -> None:

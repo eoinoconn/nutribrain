@@ -9,20 +9,26 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from app.db import session_scope
 from app.domain import parse_local_date
 from app.domain.errors import InvalidTimezoneError
-from app.settings import settings
+from app.domain.settings import get_settings
 
 
 def resolve_effective_local_tz(explicit: str | None) -> str:
     """Resolve the effective local timezone for one tool call.
 
     Precedence: an explicit `local_tz` argument wins; otherwise fall back to
-    the server's configured default (`TZ` env var, `settings.tz`). Raises
-    `InvalidTimezoneError` if the resolved value isn't a valid IANA name.
+    the account's configured timezone (`app_settings.local_timezone`, set via
+    `PATCH /api/settings`). Raises `InvalidTimezoneError` if the resolved
+    value isn't a valid IANA name.
     """
 
-    candidate = explicit if explicit is not None else settings.tz
+    if explicit is not None:
+        candidate = explicit
+    else:
+        with session_scope() as session:
+            candidate = get_settings(session).local_timezone
     try:
         ZoneInfo(candidate)
     except (ZoneInfoNotFoundError, ValueError) as exc:

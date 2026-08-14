@@ -16,12 +16,13 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.db import (
-    IntervalsCaloriesOut,
-    IntervalsSource,
     Meal,
     MealItem,
     MealItemSource,
     MealType,
+    PlannedWorkout,
+    PlannedWorkoutSource,
+    PlannedWorkoutStatus,
     QuantityUnit,
 )
 from app.domain.day_aggregation import get_day, get_range
@@ -104,33 +105,47 @@ class TestGetDay:
         self, db_session: Session, make_target, make_meal, make_meal_item, make_food
     ):
         """Effective target includes base + calories_out."""
+        # A distinct future date, not 2026-07-26 like the rest of this file's
+        # fixtures — avoids collisions with any pre-existing meals/targets for
+        # that date in a long-lived shared database.
+        day = date(2031, 7, 26)
+
         make_target(
-            effective_from=date(2026, 1, 1),
+            effective_from=date(2031, 1, 1),
             base_calories=2000,
             protein_g=150,
             carbs_g=220,
             fat_g=70,
         )
 
-        # Add calories_out for the day
-        cal_out = IntervalsCaloriesOut(
-            date=date(2026, 7, 26),
-            calories_out=500,
-            fetched_at=datetime(2026, 7, 26, 6, 0, tzinfo=UTC),
-            source=IntervalsSource.sync,
+        # Add calories_out for the day via a completed planned_workout (EC-07:
+        # get_day derives calories_out from planned_workouts, not a synced
+        # intervals_calories_out row).
+        completed_workout = PlannedWorkout(
+            external_id="w-500",
+            source=PlannedWorkoutSource.intervals_completed,
+            local_date=day,
+            start_at=datetime(2031, 7, 26, 6, 0, tzinfo=UTC),
+            duration_minutes=45,
+            sport_type="Ride",
+            icu_joules=None,
+            estimated_calories=None,
+            actual_calories=500,
+            status=PlannedWorkoutStatus.completed,
+            fetched_at=datetime(2031, 7, 26, 6, 0, tzinfo=UTC),
         )
-        db_session.add(cal_out)
+        db_session.add(completed_workout)
         db_session.flush()
 
         food = make_food(calories=Decimal("300"))
         meal = make_meal(
-            logged_at=datetime(2026, 7, 26, 12, 0, tzinfo=UTC),
-            local_date=date(2026, 7, 26),
+            logged_at=datetime(2031, 7, 26, 12, 0, tzinfo=UTC),
+            local_date=day,
             meal_type=MealType.lunch,
         )
         make_meal_item(meal_id=meal.id, food=food, name="Lunch item")
 
-        result = get_day(db_session, day=date(2026, 7, 26))
+        result = get_day(db_session, day=day)
 
         assert result.effective_target is not None
         assert result.effective_target.base_calories == 2000

@@ -7,10 +7,15 @@ implemented in one place.
 from app.domain.constants import FOOD_NAME_SIMILARITY_THRESHOLD
 from app.domain.day_aggregation import get_day, get_range
 from app.domain.dto import (
+    AppSettingsDTO,
     DayMealGroup,
     DayResponse,
     EffectiveTarget,
+    EnergyEvent,
+    EnergyPoint,
+    EnergyTimeline,
     FoodCandidate,
+    FuelingFlag,
     ItemMacros,
     ManualCaloriesOutResult,
     MealItemMatch,
@@ -18,6 +23,7 @@ from app.domain.dto import (
     MealItemSpec,
     MealResponse,
     PeriodTotals,
+    PlannedWorkoutDTO,
     RangeResponse,
     SetTargetResult,
     SyncIntervalsResult,
@@ -27,6 +33,7 @@ from app.domain.dto import (
     TemplateItemSpec,
     TemplateResponse,
 )
+from app.domain.energy_balance import compute_energy_timeline
 from app.domain.errors import (
     AdhocItemNameRequiredError,
     DomainError,
@@ -40,6 +47,8 @@ from app.domain.errors import (
     MealItemMacrosRequiredError,
     MealItemNotFoundError,
     MealNotFoundError,
+    NaiveDatetimeError,
+    NoTargetSetError,
     ServingUnitImmutableError,
     TemplateNotFoundError,
     UnauthorizedError,
@@ -76,6 +85,8 @@ from app.domain.nutrition_math import (
     compute_item_macros,
     normalize_to_grams,
 )
+from app.domain.planned_workouts import create_manual_planned_workout
+from app.domain.settings import get_settings, update_settings
 from app.domain.targets import get_effective_target, list_targets, set_target
 from app.domain.templates import (
     create_template,
@@ -89,10 +100,14 @@ __all__ = [
     "FOOD_NAME_SIMILARITY_THRESHOLD",
     "AddFoodResult",
     "AdhocItemNameRequiredError",
+    "AppSettingsDTO",
     "DayMealGroup",
     "DayResponse",
     "DomainError",
     "EffectiveTarget",
+    "EnergyEvent",
+    "EnergyPoint",
+    "EnergyTimeline",
     "FindFoodsResult",
     "FoodAmbiguousError",
     "FoodCandidate",
@@ -100,6 +115,7 @@ __all__ = [
     "FoodMergeSameFoodError",
     "FoodNotFoundError",
     "FoodSearchResult",
+    "FuelingFlag",
     "IntervalsUnavailableError",
     "InvalidTimezoneError",
     "ItemMacros",
@@ -113,7 +129,10 @@ __all__ = [
     "MealNotFoundError",
     "MealResponse",
     "MergeFoodResult",
+    "NaiveDatetimeError",
+    "NoTargetSetError",
     "PeriodTotals",
+    "PlannedWorkoutDTO",
     "RangeResponse",
     "ServingUnitImmutableError",
     "SetTargetResult",
@@ -128,8 +147,10 @@ __all__ = [
     "UnitNormalizationError",
     "UpdateFoodResult",
     "add_food",
+    "compute_energy_timeline",
     "compute_item_macros",
     "copy_meal",
+    "create_manual_planned_workout",
     "create_template",
     "delete_food",
     "delete_meal",
@@ -140,6 +161,7 @@ __all__ = [
     "get_day",
     "get_effective_target",
     "get_range",
+    "get_settings",
     "get_sync_status",
     "infer_meal_type",
     "list_targets",
@@ -160,5 +182,6 @@ __all__ = [
     "update_food",
     "update_meal",
     "update_meal_item",
+    "update_settings",
     "update_template",
 ]

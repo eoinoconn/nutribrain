@@ -44,7 +44,9 @@ describe("App", () => {
         sodiumMg: null
       },
       effectiveTarget: null,
-      deltaVsTarget: null
+      deltaVsTarget: null,
+      energy: null,
+      workouts: []
     });
   });
 

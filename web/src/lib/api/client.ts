@@ -17,6 +17,7 @@
 import { apiFetchJson } from "../apiClient";
 import { keysToCamel, keysToSnake } from "./transform";
 import type {
+  AppSettings,
   CreateFoodRequest,
   CreateMealRequest,
   CreateMealResponse,
@@ -44,6 +45,7 @@ import type {
   TemplateLogResponse,
   UpdateFoodRequest,
   UpdateFoodResponse,
+  UpdateSettingsRequest,
   UpdateTemplateRequest
 } from "./types";
 
@@ -178,4 +180,14 @@ export function setManualCaloriesOut(
   payload: SetManualCaloriesOutRequest
 ): Promise<ManualCaloriesOutResponse> {
   return sendJson<ManualCaloriesOutResponse>("/api/sync/intervals/manual", "PUT", payload);
+}
+
+// --- Settings (api/app/api/settings.py) -------------------------------------
+
+export function getSettings(): Promise<AppSettings> {
+  return getJson<AppSettings>("/api/settings");
+}
+
+export function updateSettings(payload: UpdateSettingsRequest): Promise<AppSettings> {
+  return sendJson<AppSettings>("/api/settings", "PATCH", payload);
 }

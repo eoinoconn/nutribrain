@@ -5,20 +5,25 @@ get_range, set_target, get_target).
 Exercised end-to-end via ``mcp.call_tool`` with the relevant module's
 ``run_with_session`` monkeypatched to run against the transactional
 ``db_session`` fixture, mirroring the pattern in test_mcp_write_tools.py and
-test_mcp_sync_tool.py.
+test_mcp_sync_tool.py. The account's effective-default timezone
+(``app_settings.local_timezone``, EC-06) is resolved by
+``app.mcp.date_args.resolve_effective_local_tz`` via its own short-lived
+session, so that module's ``session_scope`` is patched too, to reuse the same
+transactional ``db_session``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import contextmanager
 
 import pytest
 from sqlalchemy.orm import Session
 
+import app.mcp.date_args as date_args_module
 import app.mcp.tools_read as tools_read_module
 import app.mcp.tools_write as tools_write_module
-from app import settings as settings_module
-from app.db import Food, QuantityUnit, Template, TemplateItem
+from app.db import AppSettings, Food, QuantityUnit, Template, TemplateItem
 from app.main import mcp
 
 
@@ -29,10 +34,17 @@ def _patch_run_with_session(monkeypatch: pytest.MonkeyPatch, db_session: Session
     monkeypatch.setattr(tools_read_module, "run_with_session", fake_run_with_session)
     monkeypatch.setattr(tools_write_module, "run_with_session", fake_run_with_session)
 
+    @contextmanager
+    def fake_session_scope():
+        yield db_session
+
+    monkeypatch.setattr(date_args_module, "session_scope", fake_session_scope)
+
 
 @pytest.fixture(autouse=True)
-def _default_tz(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings_module.settings, "tz", "Europe/Dublin")
+def _default_tz(db_session: Session) -> None:
+    db_session.merge(AppSettings(id=1, local_timezone="Europe/Dublin"))
+    db_session.flush()
 
 
 @pytest.mark.asyncio
@@ -163,11 +175,12 @@ async def test_invalid_local_tz_returns_domain_error_envelope(
 
 
 @pytest.mark.asyncio
-async def test_invalid_config_default_local_tz_returns_domain_error_envelope(
+async def test_invalid_account_default_local_tz_returns_domain_error_envelope(
     monkeypatch: pytest.MonkeyPatch, db_session: Session
 ) -> None:
     _patch_run_with_session(monkeypatch, db_session)
-    monkeypatch.setattr(settings_module.settings, "tz", "Not/A_Real_Zone")
+    db_session.merge(AppSettings(id=1, local_timezone="Not/A_Real_Zone"))
+    db_session.flush()
 
     result = await mcp.call_tool("get_day", {})
 

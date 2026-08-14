@@ -23,24 +23,28 @@
  * Intervals sync failure — the only "last error" surface the backend
  * exposes anywhere).
  *
- * Timezone override: no backend field exists for this yet (confirmed by
- * reading `api/app/api/*.py`), and no shared local-settings module exists in
- * this codebase to reuse (only `tokenStore.ts` for the token) — so this
- * stays a page-local `localStorage` key, matching the token store's own
- * "small module, one constant" shape rather than inventing a bigger
- * settings-store abstraction for a single field.
+ * Timezone override (EC-06): backed by `app_settings` (`GET`/`PATCH
+ * /api/settings`, `api/app/api/settings.py`) rather than `localStorage`
+ * now — the energy chart (EC-05) needs a durable "whose midnight is this"
+ * answer that a second browser/session can also see, which a page-local
+ * `localStorage` key can never provide. Follows the same
+ * `useQuery`+`useMutation` optimistic-update-with-rollback pattern as
+ * `FoodsPage`'s `updateFoodMutation` (`cancelQueries` → snapshot →
+ * optimistic `setQueryData` → mutate → restore snapshot on error →
+ * `invalidateQueries` on settle). The browser-detected timezone is still
+ * used as the *displayed default* while the settings query is loading, so
+ * the field never renders blank before the first fetch resolves.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getSyncStatus, syncIntervals } from "../lib/api/client";
+import { getSettings, getSyncStatus, syncIntervals, updateSettings } from "../lib/api/client";
 import { ApiError } from "../lib/apiClient";
 import { queryKeys } from "../lib/queryClient";
 import { useToast } from "../design/useToast";
 import Skeleton from "../design/Skeleton";
 import { clearToken, getToken, maskToken, setToken } from "../lib/tokenStore";
-
-const TIMEZONE_STORAGE_KEY = "nutribrain:timezone-override";
+import type { AppSettings } from "../lib/api/types";
 
 type ConnectionState =
   | { status: "idle" }
@@ -194,32 +198,102 @@ function TokenSection(): JSX.Element {
 }
 
 function TimezoneSection(): JSX.Element {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [timezone, setTimezone] = useState<string>(
-    () => window.localStorage.getItem(TIMEZONE_STORAGE_KEY) ?? browserTimezone
-  );
+
+  // Displayed default before the settings query resolves (or if it's still
+  // unset server-side) — see module doc comment.
+  const [timezone, setTimezone] = useState<string>(browserTimezone);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.settings(),
+    queryFn: () => getSettings()
+  });
 
   useEffect(() => {
-    window.localStorage.setItem(TIMEZONE_STORAGE_KEY, timezone);
-  }, [timezone]);
+    if (settingsQuery.data) {
+      setTimezone(settingsQuery.data.localTimezone);
+    }
+  }, [settingsQuery.data]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: (localTimezone: string) => updateSettings({ localTimezone }),
+    onMutate: async (localTimezone) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.settings() });
+      const previous = queryClient.getQueryData<AppSettings>(queryKeys.settings());
+      queryClient.setQueryData<AppSettings>(queryKeys.settings(), { localTimezone });
+      return { previous };
+    },
+    onError: (error, _localTimezone, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.settings(), context.previous);
+        setTimezone(context.previous.localTimezone);
+      }
+      const rawMessage =
+        error instanceof ApiError && error.body && typeof error.body === "object" && "message" in error.body
+          ? (error.body as { message?: unknown }).message
+          : undefined;
+      setFormError(typeof rawMessage === "string" ? rawMessage : "Could not update timezone.");
+      showToast("Could not update timezone.", "error");
+    },
+    onSuccess: () => {
+      setFormError(null);
+      showToast("Timezone updated.", "success");
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
+    }
+  });
+
+  function handleSubmit(event: FormEvent): void {
+    event.preventDefault();
+    const trimmed = timezone.trim();
+    if (!trimmed) {
+      setFormError("Timezone is required.");
+      return;
+    }
+    updateSettingsMutation.mutate(trimmed);
+  }
 
   return (
     <div className="space-y-2 rounded-lg border border-line p-4 dark:border-line-dark">
       <h3 className="text-lg font-medium">Timezone</h3>
       <p className="text-sm text-ink-secondary dark:text-ink-secondary-dark">
-        Defaults to your browser timezone ({browserTimezone}). Stored locally only for now &mdash; no
-        backend field exists yet to persist a timezone override.
+        Defaults to your browser timezone ({browserTimezone}) until you set an override. Saved to your
+        account, so it applies across devices and sessions.
       </p>
-      <label className="block text-sm font-medium" htmlFor="timezone-override">
-        Timezone override
-      </label>
-      <input
-        id="timezone-override"
-        type="text"
-        value={timezone}
-        onChange={(event) => setTimezone(event.target.value)}
-        className="focus-ring w-full max-w-sm rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-line-dark dark:bg-canvas-dark"
-      />
+      <form className="space-y-2" onSubmit={handleSubmit}>
+        <label className="block text-sm font-medium" htmlFor="timezone-override">
+          Timezone override
+        </label>
+        <input
+          id="timezone-override"
+          type="text"
+          value={timezone}
+          onChange={(event) => setTimezone(event.target.value)}
+          disabled={settingsQuery.isLoading}
+          className="focus-ring w-full max-w-sm rounded-md border border-line bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-line-dark dark:bg-canvas-dark"
+        />
+        <button
+          type="submit"
+          disabled={updateSettingsMutation.isPending || settingsQuery.isLoading}
+          className="focus-ring rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent disabled:opacity-50"
+        >
+          {updateSettingsMutation.isPending ? "Saving..." : "Save timezone"}
+        </button>
+      </form>
+      {formError ? (
+        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+          {formError}
+        </p>
+      ) : null}
+      {settingsQuery.isError ? (
+        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+          Could not load saved timezone.
+        </p>
+      ) : null}
     </div>
   );
 }

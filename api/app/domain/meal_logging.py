@@ -11,10 +11,9 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import Food, IntervalsCaloriesOut, Meal, MealItem, MealItemSource, MealType, Target
+from app.db import Food, Meal, MealItem, MealItemSource, MealType
 from app.domain.dto import (
     ItemMacros,
     MealItemResponse,
@@ -24,6 +23,7 @@ from app.domain.dto import (
 from app.domain.food_resolution import resolve_food
 from app.domain.meal_timing import localize_naive_datetime, resolve_meal_type
 from app.domain.nutrition_math import compute_item_macros
+from app.domain.targets import get_effective_target
 from app.logging import get_logger
 
 logger = get_logger(__name__)
@@ -253,36 +253,25 @@ def _compute_delta_vs_target(
     """Compute the difference between meal totals and effective target.
 
     Returns None if no target is set for the date.
+
+    Delegates to ``targets.get_effective_target`` (EC-07) for both the target
+    row and calories_out resolution, rather than re-querying ``Target`` and
+    ``intervals_calories_out`` here — keeps this in lockstep with the target
+    panel and the energy chart's single source of truth.
     """
 
-    # Get the effective target for this date
-    target_stmt = (
-        select(Target)
-        .where(Target.effective_from <= local_date)
-        .order_by(Target.effective_from.desc())
-        .limit(1)
-    )
-    target = session.scalar(target_stmt)
-
-    if target is None:
+    effective_target = get_effective_target(session, day=local_date)
+    if effective_target is None:
         return None
 
-    # Get any cached calories_out for the date
-    cached_out = session.scalar(
-        select(IntervalsCaloriesOut).where(IntervalsCaloriesOut.date == local_date)
-    )
-
-    # Compute effective target
-    total_calories_target = Decimal(str(target.base_calories))
-    if cached_out is not None:
-        total_calories_target += Decimal(str(cached_out.calories_out))
+    total_calories_target = Decimal(str(effective_target.effective_calories))
 
     # Delta is (meal - target), so positive means over target
     return ItemMacros(
         calories=meal_totals.calories - total_calories_target,
-        protein_g=meal_totals.protein_g - Decimal(str(target.protein_g)),
-        carbs_g=meal_totals.carbs_g - Decimal(str(target.carbs_g)),
-        fat_g=meal_totals.fat_g - Decimal(str(target.fat_g)),
+        protein_g=meal_totals.protein_g - Decimal(str(effective_target.protein_g)),
+        carbs_g=meal_totals.carbs_g - Decimal(str(effective_target.carbs_g)),
+        fat_g=meal_totals.fat_g - Decimal(str(effective_target.fat_g)),
         fiber_g=meal_totals.fiber_g,  # No target for micros
         sat_fat_g=meal_totals.sat_fat_g,
         sodium_mg=meal_totals.sodium_mg,

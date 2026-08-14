@@ -162,7 +162,7 @@ class MealItemMacrosRequiredError(DomainError):
 
 
 class InvalidTimezoneError(DomainError):
-    """An explicit or effective-default local_tz is not a valid IANA name."""
+    """An explicit/effective-default local_tz or a settings update isn't a valid IANA name."""
 
     def __init__(self, tz: str) -> None:
         super().__init__(
@@ -192,3 +192,46 @@ class IntervalsUnavailableError(DomainError):
 
     def __init__(self, message: str = "intervals.icu sync failed.") -> None:
         super().__init__(error="intervals_unavailable", message=message)
+
+
+# --- Energy balance errors --------------------------------------------------
+
+
+class NoTargetSetError(DomainError):
+    """compute_energy_timeline was asked for a day with no effective target.
+
+    Unlike ``get_day``, which tolerates a missing target by leaving
+    ``effective_target``/``delta_vs_target`` as ``None`` on its response, the
+    energy timeline's basal-drain line (§5 step 1) has no way to compute a
+    per-minute drain rate without a ``base_calories`` figure to divide by
+    1440 -- there's no sensible partial timeline to return. Routes/MCP tools
+    (EC-08, not built yet) are expected to catch this and render the "no
+    target set" empty state the spec (§8) describes, mirroring how
+    ``SummaryRow`` already handles a missing target on the frontend.
+    """
+
+    def __init__(self, day: object) -> None:
+        super().__init__(
+            error="no_target_set",
+            message=f"No target is set for {day}.",
+        )
+
+
+# --- Planned workout errors -------------------------------------------------
+
+
+class NaiveDatetimeError(DomainError):
+    """A caller-supplied timestamp field is missing a UTC offset.
+
+    See docs/backlog.md KI-001: `meal_logging.log_meal`'s equivalent check
+    raises a bare `ValueError`, which surfaces as an unhandled 500 instead of
+    a 4xx. New call sites (e.g. `create_manual_planned_workout`) should raise
+    this `DomainError` subclass instead so the mapping in `app/main.py`'s
+    `ERROR_STATUS_BY_CODE` turns it into a proper 422.
+    """
+
+    def __init__(self, field: str) -> None:
+        super().__init__(
+            error="naive_datetime",
+            message=f"'{field}' must be timezone-aware (include a UTC offset).",
+        )

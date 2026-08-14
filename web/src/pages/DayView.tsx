@@ -40,8 +40,15 @@ import EmptyState from "../design/EmptyState";
 import type { DayMealGroup, DayResponse, MealItemRequest, MealType } from "../lib/api/types";
 import { MealEditor, MealItemRow, type MealEditorItem, type MealEditorValue } from "../components/MealEditor";
 import { QuickMacroEntry, type QuickMacroValue } from "../components/QuickMacroEntry";
-import { DayHeader, MEAL_TYPE_LABELS, SummaryRow, formatCalories, formatGrams } from "../components/DaySummary";
-import { buildCreateMealRequest, buildQuickMacroRequest, mealEditorItemToRequest, mealItemToEditorItem } from "../lib/mealForms";
+import EnergyChart from "../components/EnergyChart";
+import { DayHeader, SummaryRow } from "../components/DaySummary";
+import { MEAL_TYPE_LABELS, formatCalories, formatGrams } from "../components/daySummaryHelpers";
+import {
+  buildCreateMealRequest,
+  buildQuickMacroRequest,
+  mealEditorItemToRequest,
+  mealItemToEditorItem
+} from "../lib/mealForms";
 import { addDays, dayTitleLabel } from "../lib/dateNav";
 
 /** Best-effort key only; the header's displayed date always comes from the
@@ -487,6 +494,13 @@ export default function DayView(): JSX.Element {
       <div aria-busy={isRefetching} className={`space-y-8 transition-opacity ${isRefetching ? "opacity-50" : "opacity-100"}`}>
         <SummaryRow totals={day.dayTotals} target={day.effectiveTarget} />
 
+        <section aria-labelledby="live-energy-heading" className="space-y-3">
+          <h2 id="live-energy-heading" className="text-lg font-semibold">
+            {isToday ? "Live Energy" : "Energy Balance"}
+          </h2>
+          <EnergyChart energy={day.energy} isLoading={dayQuery.isLoading} isToday={isToday} />
+        </section>
+
         <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -676,6 +690,48 @@ export default function DayView(): JSX.Element {
           action={{ label: "Log a meal", onClick: handleToggleEditor }}
         />
       )}
+
+      {day.workouts.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Workouts</h2>
+          <ul className="space-y-2">
+            {day.workouts.map((workout) => {
+              const name = workout.sportType ?? "Workout";
+              const calories = workout.status === "completed" ? workout.actualCalories : workout.estimatedCalories;
+              return (
+                <li
+                  key={workout.id}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-line px-4 py-3 dark:border-line-dark"
+                >
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-ink-tertiary dark:text-ink-tertiary-dark">
+                      {new Date(workout.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span className="font-medium">{name}</span>
+                  </span>
+                  <span className="flex items-center gap-4 text-sm text-ink-tertiary dark:text-ink-secondary-dark">
+                    {calories !== null ? (
+                      <span className="font-medium text-accent dark:text-accent-dark">
+                        {formatCalories(calories)} cal
+                      </span>
+                    ) : null}
+                    {workout.status === "completed" && workout.externalId ? (
+                      <a
+                        href={`https://intervals.icu/activities/${workout.externalId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="focus-ring rounded-md border border-line px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas dark:border-line-dark dark:text-ink-secondary-dark dark:hover:bg-panel-dark"
+                      >
+                        View on intervals.icu
+                      </a>
+                    ) : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
       </div>
     </section>
   );

@@ -68,6 +68,58 @@ class TestDayRoute:
         assert payload["meals"] == {}
         assert Decimal(payload["day_totals"]["calories"]) == Decimal("0")
 
+    def test_get_day_includes_energy_when_target_set(
+        self, db_session: Session, make_food, make_meal, make_meal_item, make_target
+    ) -> None:
+        food = make_food(name="Rice", calories=Decimal("130"), serving_size=Decimal("100"))
+        make_target(effective_from=date(2026, 1, 1), base_calories=2400)
+        meal = make_meal(
+            logged_at=datetime(2026, 7, 20, 12, 0, tzinfo=UTC),
+            local_date=date(2026, 7, 20),
+            meal_type=MealType.lunch,
+        )
+        make_meal_item(meal_id=meal.id, food=food, quantity=Decimal("200"), name="Rice")
+
+        app = create_app(include_mcp_mount=False)
+        app.dependency_overrides[get_session] = _override_session(db_session)
+        try:
+            with TestClient(app) as client:
+                response = client.get("/api/day/2026-07-20", headers=_auth_headers())
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        payload = response.json()
+        energy = payload["energy"]
+        assert energy is not None
+        assert energy["end_of_day_target"] == 2400
+        assert isinstance(energy["current_balance"], int)
+        assert isinstance(energy["predicted_end_of_day"], int)
+        assert len(energy["points"]) >= 1
+        assert len(energy["forecast_points"]) >= 1
+        # The logged meal should show up as an event marker.
+        assert any(e["kind"] == "meal" for e in energy["events"])
+        for point in energy["points"] + energy["forecast_points"]:
+            assert "at" in point
+            assert "balance" in point
+
+    def test_get_day_no_target_set_has_null_energy(self, db_session: Session) -> None:
+        # A day far enough in the past that no target's effective_from could
+        # apply -- targets are versioned rows that persist indefinitely once
+        # set, so a genuinely-no-target day must predate any real target.
+        app = create_app(include_mcp_mount=False)
+        app.dependency_overrides[get_session] = _override_session(db_session)
+        try:
+            with TestClient(app) as client:
+                response = client.get("/api/day/1999-01-01", headers=_auth_headers())
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["energy"] is None
+        assert payload["effective_target"] is None
+
     def test_get_day_invalid_date_returns_422(self, db_session: Session) -> None:
         app = create_app(include_mcp_mount=False)
         app.dependency_overrides[get_session] = _override_session(db_session)

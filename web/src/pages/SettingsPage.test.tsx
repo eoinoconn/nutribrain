@@ -4,21 +4,29 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsPage from "./SettingsPage";
 import { ToastProvider } from "../design/Toast";
-import { getSyncStatus, syncIntervals } from "../lib/api/client";
+import { getSettings, getSyncStatus, syncIntervals, updateSettings } from "../lib/api/client";
 import { ApiError } from "../lib/apiClient";
 import { TOKEN_STORAGE_KEY, maskToken } from "../lib/tokenStore";
-import type { SyncStatusResponse } from "../lib/api/types";
+import type { AppSettings, SyncStatusResponse } from "../lib/api/types";
 
 vi.mock("../lib/api/client", () => ({
+  getSettings: vi.fn(),
+  updateSettings: vi.fn(),
   getSyncStatus: vi.fn(),
   syncIntervals: vi.fn()
 }));
 
+const mockedGetSettings = vi.mocked(getSettings);
+const mockedUpdateSettings = vi.mocked(updateSettings);
 const mockedGetSyncStatus = vi.mocked(getSyncStatus);
 const mockedSyncIntervals = vi.mocked(syncIntervals);
 
 function statusResponse(overrides: Partial<SyncStatusResponse> = {}): SyncStatusResponse {
   return { lastSyncedAt: "2026-07-27T12:00:00Z", lastError: null, ...overrides };
+}
+
+function settingsResponse(overrides: Partial<AppSettings> = {}): AppSettings {
+  return { localTimezone: "UTC", ...overrides };
 }
 
 function renderPage() {
@@ -38,6 +46,8 @@ describe("SettingsPage", () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     mockedGetSyncStatus.mockResolvedValue(statusResponse());
+    mockedGetSettings.mockResolvedValue(settingsResponse());
+    mockedUpdateSettings.mockImplementation((payload) => Promise.resolve(settingsResponse(payload)));
     mockedWriteText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: mockedWriteText } });
   });
@@ -128,14 +138,47 @@ describe("SettingsPage", () => {
     expect(await screen.findByText(/server responded with 500/i)).toBeInTheDocument();
   });
 
-  it("defaults the timezone override to the browser timezone and persists edits", async () => {
+  it("shows the browser timezone as the displayed default while the settings query is loading", async () => {
+    mockedGetSettings.mockReturnValue(new Promise(() => {}));
     renderPage();
     const input = await screen.findByLabelText<HTMLInputElement>(/timezone override/i);
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     expect(input.value).toBe(browserTz);
+  });
+
+  it("loads the persisted timezone from GET /api/settings once it resolves", async () => {
+    mockedGetSettings.mockResolvedValue(settingsResponse({ localTimezone: "Europe/Dublin" }));
+    renderPage();
+    const input = await screen.findByLabelText<HTMLInputElement>(/timezone override/i);
+    await waitFor(() => expect(input.value).toBe("Europe/Dublin"));
+  });
+
+  it("saves an edited timezone via PATCH /api/settings and shows a success toast", async () => {
+    renderPage();
+    const input = await screen.findByLabelText<HTMLInputElement>(/timezone override/i);
+    await waitFor(() => expect(input.value).toBe("UTC"));
 
     fireEvent.change(input, { target: { value: "America/New_York" } });
-    expect(window.localStorage.getItem("nutribrain:timezone-override")).toBe("America/New_York");
+    fireEvent.click(screen.getByRole("button", { name: /save timezone/i }));
+
+    await waitFor(() => expect(mockedUpdateSettings).toHaveBeenCalledWith({ localTimezone: "America/New_York" }));
+    expect(await screen.findByText(/timezone updated/i)).toBeInTheDocument();
+  });
+
+  it("rolls back to the previous timezone and shows an error when the save fails", async () => {
+    mockedGetSettings.mockResolvedValue(settingsResponse({ localTimezone: "UTC" }));
+    mockedUpdateSettings.mockRejectedValueOnce(
+      new ApiError(422, "Invalid timezone", { error: "invalid_timezone", message: "Not a real timezone." })
+    );
+    renderPage();
+    const input = await screen.findByLabelText<HTMLInputElement>(/timezone override/i);
+    await waitFor(() => expect(input.value).toBe("UTC"));
+
+    fireEvent.change(input, { target: { value: "Not/A_Timezone" } });
+    fireEvent.click(screen.getByRole("button", { name: /save timezone/i }));
+
+    expect(await screen.findByText(/not a real timezone\./i)).toBeInTheDocument();
+    expect(await screen.findByText(/could not update timezone\./i)).toBeInTheDocument();
   });
 
   it("shows the last synced timestamp from GET /api/sync/status", async () => {
