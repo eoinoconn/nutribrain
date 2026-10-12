@@ -46,6 +46,57 @@ services:
       - key: SENTRY_DSN
         sync: false
 
+  # Upstream Intervals.icu MCP server (https://github.com/futureweb/intervals-mcp-server),
+  # exposed to Claude.ai as a custom connector at <MCP_PUBLIC_URL>/mcp behind its built-in OAuth.
+  - type: web
+    name: intervals-mcp
+    runtime: python
+    rootDir: intervals-mcp
+    plan: starter                  # persistent disks need a paid plan
+    buildCommand: pip install -r requirements.txt
+    startCommand: FASTMCP_PORT=$PORT futureweb-intervals-mcp
+    disk:
+      name: intervals-mcp-data     # OAuth clients + refresh tokens; without it every deploy disconnects Claude
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: API_KEY
+        fromService:
+          type: web
+          name: nutrition-api
+          envVarKey: INTERVALS_API_KEY
+      - key: ATHLETE_ID
+        fromService:
+          type: web
+          name: nutrition-api
+          envVarKey: INTERVALS_ATHLETE_ID
+      - key: MCP_TRANSPORT
+        value: http
+      - key: FASTMCP_HOST
+        value: 0.0.0.0
+      - key: FORWARDED_ALLOW_IPS     # Render's proxy terminates TLS in front of uvicorn
+        value: "*"
+      - key: MCP_AUTH
+        value: oauth
+      - key: MCP_PUBLIC_URL          # set after first deploy, once intervals-mcp's actual URL is known (no trailing slash)
+        sync: false
+      - key: OAUTH_STATE_FILE
+        value: /var/data/oauth_state.json
+      - key: OAUTH_LOGIN             # sign in with the Intervals.icu API key + authenticator code
+        value: apikey
+      - key: OAUTH_TOTP_SECRET       # generate locally: python -m intervals_mcp_server.auth totp-secret
+        sync: false
+      - key: OAUTH_CLIENT_HOSTS
+        value: claude.ai,claude.com
+      - key: OAUTH_REDIRECT_HOSTS
+        value: claude.ai/api/mcp/auth_callback,claude.com/api/mcp/auth_callback
+      - key: MCP_PERMISSIONS         # read only; widen to read,write to let Claude edit the calendar
+        value: read
+      - key: ATHLETE_TIMEZONE
+        value: Europe/Dublin
+
   - type: cron
     name: nutrition-cron
     runtime: python
